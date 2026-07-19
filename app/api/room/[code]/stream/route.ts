@@ -47,10 +47,12 @@ export async function GET(
 
       await send();
 
-      await sub.subscribe(keys.channel(code));
+      // Attach the handler before subscribing so no publish can slip through
+      // the gap between the subscription going live and the listener existing.
       sub.on("message", () => {
         void send();
       });
+      await sub.subscribe(keys.channel(code));
 
       // heartbeat keeps proxies from closing the idle connection
       const heartbeat = setInterval(() => {

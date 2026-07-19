@@ -9,3 +9,10 @@
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# Playwright
+/test-results
+/playwright-report
+/e2e/results
+/blob-report
+/playwright/.cache
