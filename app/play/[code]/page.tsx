@@ -343,8 +343,13 @@ function RoundView({
     ? "Choose a villager"
     : "Vote for who you suspect";
 
-  // Dead players can cast a day vote when the host enabled ghost votes.
-  const ghostCanVote = !isNight && !alive && state.settings.ghostVotes;
+  // Dead players can cast a day vote when the host enabled ghost votes —
+  // but never dead killers, who would only help their own side.
+  const ghostCanVote =
+    !isNight &&
+    !alive &&
+    state.settings.ghostVotes &&
+    state.you.role !== "killer";
   const canVote = alive || ghostCanVote;
 
   const targets = state.players.filter(
