@@ -274,6 +274,7 @@ export async function buildClientState(
   let submitted = false;
   let yourPick: string | undefined;
   let submittedCount = 0;
+  let liveVotes: Record<string, string> | undefined;
   if (scratchKey) {
     const [mine, all] = await Promise.all([
       redis().hget(scratchKey, viewerToken),
@@ -285,6 +286,18 @@ export async function buildClientState(
       players.filter((p) => p.alive).map((p) => p.token)
     );
     submittedCount = Object.keys(all).filter((t) => livingTokens.has(t)).length;
+
+    // Day votes are public: expose the live tally to everyone so votes can
+    // sway toward a majority before the host locks in. Night actions are
+    // secret and are never surfaced here.
+    if (room.phase === "day_vote") {
+      liveVotes = {};
+      for (const [voter, target] of Object.entries(all)) {
+        if (livingTokens.has(voter) && livingTokens.has(target)) {
+          liveVotes[voter] = target;
+        }
+      }
+    }
   }
 
   return {
@@ -304,6 +317,7 @@ export async function buildClientState(
     yourPick,
     submittedCount,
     livingCount: players.filter((p) => p.alive).length,
+    liveVotes,
     announcement: room.announcement,
     voteResult: room.voteResult,
     winner: room.winner,

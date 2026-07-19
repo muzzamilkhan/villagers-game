@@ -73,6 +73,10 @@ export interface ClientState {
   // how many living players have submitted (for host progress)
   submittedCount: number;
   livingCount: number;
+  // day_vote only: public running tally, voter token → target token.
+  // Lets everyone see who's voting for whom before the host locks it in.
+  // Never populated at night — night actions stay secret.
+  liveVotes?: Record<string, string>;
   announcement?: string;
   voteResult?: string;
   winner?: "villagers" | "killers";
