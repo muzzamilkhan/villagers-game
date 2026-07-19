@@ -55,6 +55,19 @@ export async function removePlayer(code: string, token: string): Promise<void> {
   await r.hdel(keys.votes(code), token);
 }
 
+// Wipe every trace of a room from Redis. After this, buildClientState returns
+// null for all viewers, so each SSE stream pushes a `gone` event and closes.
+export async function deleteRoom(code: string): Promise<void> {
+  const r = redis();
+  await r.del(
+    keys.room(code),
+    keys.players(code),
+    keys.order(code),
+    keys.actions(code),
+    keys.votes(code)
+  );
+}
+
 // ---------- role assignment ----------
 
 function shuffle<T>(arr: T[]): T[] {

@@ -91,7 +91,13 @@ export default function GamePage({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <TopBar code={code} state={state} connected={connected} />
+      <TopBar
+        code={code}
+        state={state}
+        connected={connected}
+        isHost={isHost}
+        act={act}
+      />
 
       {err && <p className="text-center font-semibold text-blood">{err}</p>}
 
@@ -132,10 +138,14 @@ function TopBar({
   code,
   state,
   connected,
+  isHost,
+  act,
 }: {
   code: string;
   state: ClientState;
   connected: boolean;
+  isHost: boolean;
+  act: (p: string, b: Record<string, unknown>) => void;
 }) {
   const phaseLabel: Record<string, string> = {
     lobby: "The Gathering",
@@ -147,7 +157,10 @@ function TopBar({
   };
   return (
     <div className="flex items-center justify-between text-parchment/80">
-      <span className="font-display text-lg">{phaseLabel[state.phase]}</span>
+      <span className="flex items-center gap-3">
+        <span className="font-display text-lg">{phaseLabel[state.phase]}</span>
+        {isHost && <EndGameButton act={act} />}
+      </span>
       <span className="flex items-center gap-2 text-sm">
         <span
           className={`h-2 w-2 rounded-full ${
@@ -157,6 +170,41 @@ function TopBar({
         {code}
       </span>
     </div>
+  );
+}
+
+// Host-only. Two-tap confirm so the game isn't ended by accident. Ending wipes
+// the room from Redis; every player then sees "This game has ended."
+function EndGameButton({
+  act,
+}: {
+  act: (p: string, b: Record<string, unknown>) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
+  if (confirming) {
+    return (
+      <button
+        className="rounded-md border border-blood bg-blood/20 px-2 py-1 text-xs font-semibold text-blood"
+        onClick={() => act("end", {})}
+      >
+        End for everyone?
+      </button>
+    );
+  }
+  return (
+    <button
+      className="rounded-md border border-blood px-2 py-1 text-xs text-blood"
+      onClick={() => setConfirming(true)}
+    >
+      End game
+    </button>
   );
 }
 
