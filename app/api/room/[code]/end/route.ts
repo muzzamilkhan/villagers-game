@@ -22,7 +22,7 @@ export async function POST(
   }
   if (room.hostToken !== token) {
     return NextResponse.json(
-      { error: "Only the host can end the game." },
+      { error: "Only the Village Elder can end the game." },
       { status: 403 }
     );
   }

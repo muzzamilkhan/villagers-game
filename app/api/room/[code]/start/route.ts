@@ -19,7 +19,7 @@ export async function POST(
     return NextResponse.json({ error: "Game not found." }, { status: 404 });
   }
   if (room.hostToken !== token) {
-    return NextResponse.json({ error: "Only the host can start." }, { status: 403 });
+    return NextResponse.json({ error: "Only the Village Elder can start." }, { status: 403 });
   }
   if (room.phase !== "lobby") {
     return NextResponse.json({ error: "Already started." }, { status: 409 });

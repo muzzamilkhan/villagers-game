@@ -24,7 +24,7 @@ export async function POST(
     return NextResponse.json({ error: "Game not found." }, { status: 404 });
   }
   if (room.hostToken !== token) {
-    return NextResponse.json({ error: "Only the host controls the game." }, { status: 403 });
+    return NextResponse.json({ error: "Only the Village Elder controls the game." }, { status: 403 });
   }
 
   switch (room.phase) {

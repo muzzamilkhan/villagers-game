@@ -20,7 +20,7 @@ export async function POST(
     return NextResponse.json({ error: "Game not found." }, { status: 404 });
   }
   if (room.hostToken !== token) {
-    return NextResponse.json({ error: "Only the host can kick." }, { status: 403 });
+    return NextResponse.json({ error: "Only the Village Elder can kick." }, { status: 403 });
   }
   if (room.phase !== "lobby") {
     return NextResponse.json(
@@ -29,7 +29,7 @@ export async function POST(
     );
   }
   if (target === room.hostToken) {
-    return NextResponse.json({ error: "The host can't be kicked." }, { status: 400 });
+    return NextResponse.json({ error: "The Village Elder can't be kicked." }, { status: 400 });
   }
 
   await removePlayer(code, target);

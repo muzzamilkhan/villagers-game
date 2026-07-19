@@ -296,7 +296,9 @@ function Lobby({
           >
             <span className="font-display text-lg">
               {p.name}
-              {p.isHost && <span className="ml-2 text-sm text-gold">host</span>}
+              {p.isHost && (
+                <span className="ml-2 text-sm text-gold">Village Elder</span>
+              )}
               {p.token === state.you.token && (
                 <span className="ml-2 text-sm text-parchment/50">you</span>
               )}
@@ -326,7 +328,7 @@ function Lobby({
           </button>
         ) : (
           <p className="text-center text-parchment/60">
-            Waiting for the host to begin…
+            Waiting for the Village Elder to begin…
           </p>
         )}
       </div>
@@ -570,7 +572,7 @@ function ResultView({
         </button>
       ) : (
         <p className="text-center text-parchment/60">
-          Waiting for the host…
+          Waiting for the Village Elder…
         </p>
       )}
     </div>
