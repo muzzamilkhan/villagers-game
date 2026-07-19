@@ -1,0 +1,168 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { saveToken, postAction } from "@/lib/client";
+import { normalizeCode } from "@/lib/codes";
+
+export default function Home() {
+  const router = useRouter();
+  const [mode, setMode] = useState<"menu" | "create" | "join">("menu");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [killers, setKillers] = useState(1);
+  const [healer, setHealer] = useState(true);
+  const [maxPlayers, setMaxPlayers] = useState(10);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function createGame() {
+    if (!name.trim()) return setError("Enter your name.");
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/room/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          settings: { killers, healer, maxPlayers, actionTimerSec: 60 },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed.");
+      saveToken(data.code, data.token);
+      router.push(`/play/${data.code}`);
+    } catch (e: any) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  async function joinGame() {
+    const c = normalizeCode(code);
+    if (!name.trim()) return setError("Enter your name.");
+    if (!c) return setError("Enter a game code.");
+    setBusy(true);
+    setError("");
+    const res = await postAction(c, "join", { name });
+    if (!res.ok) {
+      setError(res.error ?? "Failed.");
+      setBusy(false);
+      return;
+    }
+    saveToken(c, res.data.token);
+    router.push(`/play/${c}`);
+  }
+
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-6">
+      <header className="text-center">
+        <h1 className="font-display text-5xl font-bold tracking-wide text-gold">
+          Villagers
+        </h1>
+        <p className="mt-2 text-parchment/70">Trust no one after dark.</p>
+      </header>
+
+      {mode === "menu" && (
+        <div className="flex flex-col gap-3">
+          <button className="btn btn-primary" onClick={() => setMode("create")}>
+            Host a Game
+          </button>
+          <button className="btn btn-ghost" onClick={() => setMode("join")}>
+            Join a Game
+          </button>
+        </div>
+      )}
+
+      {mode !== "menu" && (
+        <div className="card flex flex-col gap-4 p-5">
+          <label className="flex flex-col gap-1">
+            <span className="font-display text-sm uppercase tracking-wide">Your name</span>
+            <input
+              className="rounded-lg border-2 border-wood-light bg-parchment px-3 py-2 text-lg text-ink outline-none"
+              value={name}
+              maxLength={20}
+              placeholder="Sir Reginald"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+
+          {mode === "join" && (
+            <label className="flex flex-col gap-1">
+              <span className="font-display text-sm uppercase tracking-wide">Game code</span>
+              <input
+                className="rounded-lg border-2 border-wood-light bg-parchment px-3 py-2 text-2xl uppercase tracking-[0.3em] text-ink outline-none"
+                value={code}
+                maxLength={6}
+                placeholder="ABCD"
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+              />
+            </label>
+          )}
+
+          {mode === "create" && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm uppercase tracking-wide">Killers</span>
+                <div className="flex gap-2">
+                  {[1, 2].map((k) => (
+                    <button
+                      key={k}
+                      className={`h-10 w-10 rounded-lg border-2 font-display ${
+                        killers === k
+                          ? "border-blood bg-blood text-parchment"
+                          : "border-wood-light bg-parchment/40 text-ink"
+                      }`}
+                      onClick={() => setKillers(k)}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm uppercase tracking-wide">Healer</span>
+                <button
+                  className={`h-10 w-20 rounded-lg border-2 font-display ${
+                    healer
+                      ? "border-forest bg-forest text-parchment"
+                      : "border-wood-light bg-parchment/40 text-ink"
+                  }`}
+                  onClick={() => setHealer((h) => !h)}
+                >
+                  {healer ? "Yes" : "No"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm uppercase tracking-wide">Max players</span>
+                <input
+                  type="range"
+                  min={4}
+                  max={10}
+                  value={maxPlayers}
+                  onChange={(e) => setMaxPlayers(Number(e.target.value))}
+                  className="w-32"
+                />
+                <span className="w-6 text-center font-display text-lg">{maxPlayers}</span>
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-center font-semibold text-blood">{error}</p>}
+
+          <button
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={mode === "create" ? createGame : joinGame}
+          >
+            {busy ? "…" : mode === "create" ? "Create" : "Join"}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setMode("menu")} disabled={busy}>
+            Back
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

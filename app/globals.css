@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 0%, #3b2a1a 0%, transparent 60%),
+    #241a10;
+  background-color: #241a10;
+  color: #f2e6cf;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* subtle parchment card */
+.card {
+  background: linear-gradient(180deg, #f2e6cf 0%, #e6d5b0 100%);
+  color: #2b2016;
+  border: 2px solid #5a4128;
+  border-radius: 14px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+}
+
+.btn {
+  @apply w-full rounded-xl px-4 py-3 font-display text-lg font-semibold transition active:translate-y-0.5 disabled:opacity-40;
+}
+.btn-primary {
+  background: linear-gradient(180deg, #a67c2e 0%, #7a5a1e 100%);
+  color: #f7efdb;
+  border: 2px solid #5a4128;
+}
+.btn-danger {
+  background: linear-gradient(180deg, #7a1f1f 0%, #5a1414 100%);
+  color: #f7efdb;
+  border: 2px solid #401010;
+}
+.btn-ghost {
+  background: transparent;
+  color: #f2e6cf;
+  border: 2px solid #5a4128;
+}
+
+.crest {
+  @apply flex flex-col items-center justify-center rounded-xl border-2 p-3 text-center transition active:scale-95;
+  min-height: 88px;
+}
