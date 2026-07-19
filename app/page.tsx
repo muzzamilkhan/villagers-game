@@ -68,7 +68,7 @@ export default function Home() {
       {mode === "menu" && (
         <div className="flex flex-col gap-3">
           <button className="btn btn-primary" onClick={() => setMode("create")}>
-            Host a Game
+            Create a Game
           </button>
           <button className="btn btn-ghost" onClick={() => setMode("join")}>
             Join a Game

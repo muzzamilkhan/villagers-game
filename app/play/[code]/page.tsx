@@ -8,7 +8,7 @@ import {
   useGameStream,
   postAction,
 } from "@/lib/client";
-import type { ClientState, Role } from "@/lib/types";
+import type { ClientState, Phase, Role } from "@/lib/types";
 
 const ROLE_INFO: Record<Role, { title: string; blurb: string; color: string }> = {
   villager: {
@@ -91,6 +91,7 @@ export default function GamePage({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
+      <PhaseBackground state={state} />
       <TopBar
         code={code}
         state={state}
@@ -131,6 +132,56 @@ export default function GamePage({
 function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center">{children}</div>
+  );
+}
+
+// Fixed backdrop that tells you the phase at a glance: two stable states
+// (night = dark, day = light) with the transitions between them — dawn, the
+// verdict, and a win-tinted ending — plus the neutral lobby. Every theme is
+// always rendered; only the active one is opaque, so the shift crossfades
+// smoothly (the dark→dawn→light sweep reads like time passing).
+const PHASE_THEMES = [
+  "lobby",
+  "night",
+  "dawn",
+  "day",
+  "verdict",
+  "win-villagers",
+  "win-killers",
+] as const;
+type PhaseTheme = (typeof PHASE_THEMES)[number];
+
+function themeForPhase(phase: Phase, winner?: ClientState["winner"]): PhaseTheme {
+  switch (phase) {
+    case "night_action":
+      return "night";
+    case "resolve":
+      return "dawn";
+    case "day_vote":
+      return "day";
+    case "day_result":
+      return "verdict";
+    case "game_over":
+      return winner === "killers" ? "win-killers" : "win-villagers";
+    case "lobby":
+    default:
+      return "lobby";
+  }
+}
+
+function PhaseBackground({ state }: { state: ClientState }) {
+  const active = themeForPhase(state.phase, state.winner);
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+      {PHASE_THEMES.map((t) => (
+        <div
+          key={t}
+          className={`phase-layer phase-${t} ${
+            t === active ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -245,7 +296,9 @@ function Lobby({
           >
             <span className="font-display text-lg">
               {p.name}
-              {p.isHost && <span className="ml-2 text-sm text-gold">host</span>}
+              {p.isHost && (
+                <span className="ml-2 text-sm text-gold">Village Elder</span>
+              )}
               {p.token === state.you.token && (
                 <span className="ml-2 text-sm text-parchment/50">you</span>
               )}
@@ -275,7 +328,7 @@ function Lobby({
           </button>
         ) : (
           <p className="text-center text-parchment/60">
-            Waiting for the host to begin…
+            Waiting for the Village Elder to begin…
           </p>
         )}
       </div>
@@ -485,6 +538,34 @@ function ResultView({
 }) {
   const isNight = state.phase === "resolve";
   const text = isNight ? state.announcement : state.voteResult;
+
+  // The dawn reveal is held back a few seconds for suspense: as the dark→dawn
+  // background sweeps in, everyone waits to learn who survived the night before
+  // the announcement lands. The day verdict shows immediately.
+  const [revealed, setRevealed] = useState(!isNight);
+  useEffect(() => {
+    if (!isNight) {
+      setRevealed(true);
+      return;
+    }
+    setRevealed(false);
+    const t = setTimeout(() => setRevealed(true), 3500);
+    return () => clearTimeout(t);
+  }, [isNight]);
+
+  if (isNight && !revealed) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+        <p className="animate-pulse font-display text-2xl text-parchment/85">
+          Dawn breaks over the village…
+        </p>
+        <p className="text-sm text-parchment/50">
+          The deeds of the night come to light.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="card flex flex-1 flex-col items-center justify-center p-6 text-center">
@@ -496,7 +577,7 @@ function ResultView({
         </button>
       ) : (
         <p className="text-center text-parchment/60">
-          Waiting for the host…
+          Waiting for the Village Elder…
         </p>
       )}
     </div>

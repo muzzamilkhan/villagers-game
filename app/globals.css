@@ -16,6 +16,55 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Per-phase background layers. All are stacked absolutely and crossfaded via
+   opacity so the light↔dark shift feels like time passing, not a hard cut.
+   Every theme stays dark enough at the top that the parchment TopBar text
+   still reads. */
+.phase-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 1500ms ease-in-out;
+}
+/* The Gathering — warm, torch-lit tavern; neither day nor night. */
+.phase-lobby {
+  background:
+    radial-gradient(circle at 50% 0%, #3b2a1a 0%, transparent 60%),
+    #241a10;
+}
+/* Night — cold, deep indigo under a distant moon. */
+.phase-night {
+  background:
+    radial-gradient(circle at 50% 14%, #2a3a5a 0%, transparent 52%),
+    #0a0f1c;
+}
+/* Dawn — dark sky lifting into a warm horizon at the foot of the screen. */
+.phase-dawn {
+  background: linear-gradient(180deg, #14203c 0%, #5a3630 55%, #b5763a 100%);
+}
+/* Day — bright, warm daylight (kept in a readable amber range). */
+.phase-day {
+  background:
+    radial-gradient(circle at 50% 0%, #6b5836 0%, transparent 62%),
+    #443521;
+}
+/* The Verdict — tense dusk with a wash of blood. */
+.phase-verdict {
+  background:
+    radial-gradient(circle at 50% 0%, #5a2020 0%, transparent 60%),
+    #2a1414;
+}
+/* Game over — background tinted by who won, doubling as a win indicator. */
+.phase-win-villagers {
+  background:
+    radial-gradient(circle at 50% 0%, #3d5a3d 0%, transparent 60%),
+    #16240f;
+}
+.phase-win-killers {
+  background:
+    radial-gradient(circle at 50% 0%, #5a1414 0%, transparent 60%),
+    #1a0a0a;
+}
+
 /* subtle parchment card */
 .card {
   background: linear-gradient(180deg, #f2e6cf 0%, #e6d5b0 100%);
