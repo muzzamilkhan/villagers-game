@@ -7,7 +7,9 @@ import { normalizeCode } from "@/lib/codes";
 
 export default function Home() {
   const router = useRouter();
-  const [mode, setMode] = useState<"menu" | "create" | "join">("menu");
+  const [mode, setMode] = useState<"menu" | "create" | "join" | "observe">(
+    "menu"
+  );
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [killers, setKillers] = useState(1);
@@ -56,6 +58,12 @@ export default function Home() {
     router.push(`/play/${c}`);
   }
 
+  function observeGame() {
+    const c = normalizeCode(code);
+    if (!c) return setError("Enter a game code.");
+    router.push(`/observe/${c}`);
+  }
+
   return (
     <div className="flex flex-1 flex-col justify-center gap-6">
       <header className="text-center">
@@ -73,23 +81,38 @@ export default function Home() {
           <button className="btn btn-ghost" onClick={() => setMode("join")}>
             Join a Game
           </button>
+          <button className="btn btn-ghost" onClick={() => setMode("observe")}>
+            Observe a Game
+          </button>
+          <p className="text-center text-sm text-parchment/50">
+            Observing shows the game on a shared screen — great for projecting.
+          </p>
         </div>
       )}
 
       {mode !== "menu" && (
         <div className="card flex flex-col gap-4 p-5">
-          <label className="flex flex-col gap-1">
-            <span className="font-display text-sm uppercase tracking-wide">Your name</span>
-            <input
-              className="rounded-lg border-2 border-wood-light bg-parchment px-3 py-2 text-lg text-ink outline-none"
-              value={name}
-              maxLength={20}
-              placeholder="Sir Reginald"
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
+          {mode === "observe" && (
+            <p className="text-center text-ink/70">
+              Watch the game unfold without joining — no name needed. Ideal for a
+              big screen everyone can see.
+            </p>
+          )}
 
-          {mode === "join" && (
+          {mode !== "observe" && (
+            <label className="flex flex-col gap-1">
+              <span className="font-display text-sm uppercase tracking-wide">Your name</span>
+              <input
+                className="rounded-lg border-2 border-wood-light bg-parchment px-3 py-2 text-lg text-ink outline-none"
+                value={name}
+                maxLength={20}
+                placeholder="Sir Reginald"
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+          )}
+
+          {(mode === "join" || mode === "observe") && (
             <label className="flex flex-col gap-1">
               <span className="font-display text-sm uppercase tracking-wide">Game code</span>
               <input
@@ -168,9 +191,21 @@ export default function Home() {
           <button
             className="btn btn-primary"
             disabled={busy}
-            onClick={mode === "create" ? createGame : joinGame}
+            onClick={
+              mode === "create"
+                ? createGame
+                : mode === "observe"
+                  ? observeGame
+                  : joinGame
+            }
           >
-            {busy ? "…" : mode === "create" ? "Create" : "Join"}
+            {busy
+              ? "…"
+              : mode === "create"
+                ? "Create"
+                : mode === "observe"
+                  ? "Observe"
+                  : "Join"}
           </button>
           <button className="btn btn-ghost" onClick={() => setMode("menu")} disabled={busy}>
             Back
