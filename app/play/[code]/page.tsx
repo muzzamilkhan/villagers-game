@@ -295,6 +295,10 @@ function RoundView({
     ? "Choose a villager"
     : "Vote for who you suspect";
 
+  // Dead players can cast a day vote when the host enabled ghost votes.
+  const ghostCanVote = !isNight && !alive && state.settings.ghostVotes;
+  const canVote = alive || ghostCanVote;
+
   const targets = state.players.filter(
     (p) => p.alive && p.token !== state.you.token
   );
@@ -317,8 +321,13 @@ function RoundView({
         <RoleCard state={state} revealed={roleRevealed} onReveal={onReveal} />
       )}
 
-      {alive ? (
+      {canVote ? (
         <>
+          {ghostCanVote && (
+            <p className="text-center text-sm text-blood">
+              You are a ghost — but your voice still counts.
+            </p>
+          )}
           <p className="text-center font-display text-lg text-parchment/90">
             {prompt}
           </p>
@@ -397,7 +406,7 @@ function RoundView({
 
       <div className="mt-auto flex flex-col gap-2">
         <p className="text-center text-sm text-parchment/60">
-          {state.submittedCount} / {state.livingCount} chosen
+          {state.submittedCount} / {state.voterCount} chosen
         </p>
         {isHost && (
           <button
