@@ -53,6 +53,25 @@ export async function removePlayer(code: string, token: string): Promise<void> {
   await r.lrem(keys.order(code), 0, token);
   await r.hdel(keys.actions(code), token);
   await r.hdel(keys.votes(code), token);
+  // Also drop any pending pick that *targeted* this player, so no one's action
+  // or vote still points at a player who's now gone.
+  await clearTargetReferences(code, token);
+}
+
+// Remove pending night actions / day votes whose target is the given token.
+// Used when a player leaves mid-round so live picks never reference a ghost.
+export async function clearTargetReferences(
+  code: string,
+  token: string
+): Promise<void> {
+  const r = redis();
+  for (const key of [keys.actions(code), keys.votes(code)]) {
+    const map = await r.hgetall(key);
+    const stale = Object.entries(map)
+      .filter(([, target]) => target === token)
+      .map(([actor]) => actor);
+    if (stale.length) await r.hdel(key, ...stale);
+  }
 }
 
 // Wipe every trace of a room from Redis. After this, buildClientState returns

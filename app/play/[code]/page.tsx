@@ -38,6 +38,7 @@ export default function GamePage({
   const [token, setToken] = useState<string | null>(null);
   const [roleRevealed, setRoleRevealed] = useState(false);
   const [err, setErr] = useState("");
+  const [showPlayers, setShowPlayers] = useState(false);
 
   useEffect(() => {
     const t = loadToken(code);
@@ -98,7 +99,21 @@ export default function GamePage({
         connected={connected}
         isHost={isHost}
         act={act}
+        showPlayers={showPlayers}
+        onTogglePlayers={
+          isHost && state.phase !== "lobby"
+            ? () => setShowPlayers((v) => !v)
+            : undefined
+        }
       />
+
+      {isHost && state.phase !== "lobby" && showPlayers && (
+        <PlayersPanel
+          state={state}
+          act={act}
+          onClose={() => setShowPlayers(false)}
+        />
+      )}
 
       {err && <p className="text-center font-semibold text-blood">{err}</p>}
 
@@ -191,12 +206,16 @@ function TopBar({
   connected,
   isHost,
   act,
+  showPlayers,
+  onTogglePlayers,
 }: {
   code: string;
   state: ClientState;
   connected: boolean;
   isHost: boolean;
   act: (p: string, b: Record<string, unknown>) => void;
+  showPlayers: boolean;
+  onTogglePlayers?: () => void;
 }) {
   const phaseLabel: Record<string, string> = {
     lobby: "The Gathering",
@@ -211,6 +230,18 @@ function TopBar({
       <span className="flex items-center gap-3">
         <span className="font-display text-lg">{phaseLabel[state.phase]}</span>
         {isHost && <EndGameButton act={act} />}
+        {onTogglePlayers && (
+          <button
+            className={`rounded-md border px-2 py-1 text-xs ${
+              showPlayers
+                ? "border-gold bg-gold/20 text-gold"
+                : "border-wood-light text-parchment/70"
+            }`}
+            onClick={onTogglePlayers}
+          >
+            Players
+          </button>
+        )}
       </span>
       <span className="flex items-center gap-2 text-sm">
         <span
@@ -255,6 +286,93 @@ function EndGameButton({
       onClick={() => setConfirming(true)}
     >
       End game
+    </button>
+  );
+}
+
+// Host-only roster shown during the game. Surfaces who's offline (left or
+// inactive) or already a ghost, and lets the host remove anyone but themselves.
+// Kicking mid-game re-checks the win condition on the server.
+function PlayersPanel({
+  state,
+  act,
+  onClose,
+}: {
+  state: ClientState;
+  act: (p: string, b: Record<string, unknown>) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="card flex flex-col gap-2 p-4">
+      <div className="flex items-center justify-between">
+        <p className="font-display text-ink">Manage players</p>
+        <button
+          className="text-sm text-wood underline"
+          onClick={onClose}
+        >
+          close
+        </button>
+      </div>
+      {state.players.map((p) => (
+        <div
+          key={p.token}
+          className="flex items-center justify-between rounded-lg border-2 border-wood-light bg-wood/40 px-3 py-2"
+        >
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-display text-lg text-parchment">{p.name}</span>
+            {p.isHost && <span className="text-xs text-gold">Village Elder</span>}
+            {p.token === state.you.token && (
+              <span className="text-xs text-parchment/50">you</span>
+            )}
+            {!p.alive && <span className="text-xs text-blood">ghost</span>}
+            {!p.connected && (
+              <span className="rounded-full bg-blood/20 px-2 text-xs text-blood">
+                offline
+              </span>
+            )}
+          </span>
+          {!p.isHost && <KickButton token={p.token} act={act} />}
+        </div>
+      ))}
+      <p className="text-xs text-wood">
+        Removing a player can end the game if it changes who's left standing.
+      </p>
+    </div>
+  );
+}
+
+// Two-tap confirm so a player isn't removed mid-game by accident.
+function KickButton({
+  token,
+  act,
+}: {
+  token: string;
+  act: (p: string, b: Record<string, unknown>) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
+  if (confirming) {
+    return (
+      <button
+        className="rounded-md border border-blood bg-blood/20 px-2 py-1 text-sm font-semibold text-blood"
+        onClick={() => act("kick", { target: token })}
+      >
+        Remove?
+      </button>
+    );
+  }
+  return (
+    <button
+      className="rounded-md border border-blood px-2 py-1 text-sm text-blood"
+      onClick={() => setConfirming(true)}
+    >
+      kick
     </button>
   );
 }
