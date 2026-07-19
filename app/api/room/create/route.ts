@@ -16,7 +16,8 @@ function clampSettings(input: any): GameSettings {
   const actionTimerSec = Number.isFinite(rawTimer)
     ? Math.min(120, Math.max(0, rawTimer))
     : 60;
-  return { maxPlayers, killers, healer, actionTimerSec };
+  const ghostVotes = input?.ghostVotes === true;
+  return { maxPlayers, killers, healer, actionTimerSec, ghostVotes };
 }
 
 export async function POST(req: NextRequest) {

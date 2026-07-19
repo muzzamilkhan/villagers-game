@@ -167,7 +167,9 @@ export async function resolveVote(code: string, room: Room): Promise<Room> {
   const tally = new Map<string, number>();
   for (const [voter, target] of Object.entries(votes)) {
     const v = byToken.get(voter);
-    if (!v || !v.alive) continue;
+    if (!v) continue;
+    // Dead players count only when ghost-voting is enabled for the room.
+    if (!v.alive && !room.settings.ghostVotes) continue;
     tally.set(target, (tally.get(target) ?? 0) + 1);
   }
 
@@ -284,9 +286,21 @@ export async function buildClientState(
         ? keys.votes(code)
         : null;
 
+  const livingTokens = new Set(
+    players.filter((p) => p.alive).map((p) => p.token)
+  );
+  const ghostDayVote = room.phase === "day_vote" && room.settings.ghostVotes;
+  // Who may submit this phase: living players always, plus ghosts during the
+  // day when the host enabled ghost votes.
+  const eligibleTokens = ghostDayVote
+    ? new Set(players.map((p) => p.token))
+    : livingTokens;
+
   let submitted = false;
   let yourPick: string | undefined;
   let submittedCount = 0;
+  let voterCount = livingTokens.size;
+  let liveVotes: Record<string, string> | undefined;
   if (scratchKey) {
     const [mine, all] = await Promise.all([
       redis().hget(scratchKey, viewerToken),
@@ -294,10 +308,23 @@ export async function buildClientState(
     ]);
     yourPick = mine ?? undefined;
     submitted = mine != null;
-    const livingTokens = new Set(
-      players.filter((p) => p.alive).map((p) => p.token)
-    );
-    submittedCount = Object.keys(all).filter((t) => livingTokens.has(t)).length;
+    submittedCount = Object.keys(all).filter((t) =>
+      eligibleTokens.has(t)
+    ).length;
+    voterCount = eligibleTokens.size;
+
+    // Day votes are public: expose the live tally to everyone so votes can
+    // sway toward a majority before the host locks in. Night actions are
+    // secret and are never surfaced here. Targets are always living players;
+    // voters include ghosts when ghost-voting is on.
+    if (room.phase === "day_vote") {
+      liveVotes = {};
+      for (const [voter, target] of Object.entries(all)) {
+        if (eligibleTokens.has(voter) && livingTokens.has(target)) {
+          liveVotes[voter] = target;
+        }
+      }
+    }
   }
 
   return {
@@ -316,7 +343,9 @@ export async function buildClientState(
     submitted,
     yourPick,
     submittedCount,
-    livingCount: players.filter((p) => p.alive).length,
+    livingCount: livingTokens.size,
+    voterCount,
+    liveVotes,
     announcement: room.announcement,
     voteResult: room.voteResult,
     winner: room.winner,
