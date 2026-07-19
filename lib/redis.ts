@@ -26,8 +26,25 @@ export function redis(): Redis {
 }
 
 // A fresh connection dedicated to pub/sub (subscribe blocks the connection).
+//
+// Subscriber connections must NOT run ioredis's ready-check: that check issues
+// an `INFO` command, which Redis rejects on a connection already in subscribe
+// mode ("only (P|S)SUBSCRIBE / … allowed in this context"). When many streams
+// connect at once (every player + observer opens one), that race makes some
+// subscriptions silently fail — the client gets its initial state but no
+// live updates. Disabling the ready check (and the per-request retry cap, which
+// isn't meaningful for a blocking subscriber) keeps every stream reliable under
+// concurrency.
 export function subscriber(): Redis {
-  return makeClient();
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    throw new Error("REDIS_URL is not set. Copy .env.example to .env.local.");
+  }
+  return new Redis(url, {
+    enableReadyCheck: false,
+    maxRetriesPerRequest: null,
+    lazyConnect: false,
+  });
 }
 
 export const ROOM_TTL_SEC = 60 * 60 * 4; // rooms self-clean after 4h
