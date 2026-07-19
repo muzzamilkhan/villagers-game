@@ -12,6 +12,7 @@ export default function Home() {
   const [code, setCode] = useState("");
   const [killers, setKillers] = useState(1);
   const [healer, setHealer] = useState(true);
+  const [ghostVotes, setGhostVotes] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +27,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          settings: { killers, healer, maxPlayers, actionTimerSec: 60 },
+          settings: { killers, healer, ghostVotes, maxPlayers, actionTimerSec: 60 },
         }),
       });
       const data = await res.json();
@@ -132,6 +133,19 @@ export default function Home() {
                   onClick={() => setHealer((h) => !h)}
                 >
                   {healer ? "Yes" : "No"}
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm uppercase tracking-wide">Ghost votes</span>
+                <button
+                  className={`h-10 w-20 rounded-lg border-2 font-display ${
+                    ghostVotes
+                      ? "border-gold bg-gold text-ink"
+                      : "border-wood-light bg-parchment/40 text-ink"
+                  }`}
+                  onClick={() => setGhostVotes((g) => !g)}
+                >
+                  {ghostVotes ? "Yes" : "No"}
                 </button>
               </div>
               <div className="flex items-center justify-between">

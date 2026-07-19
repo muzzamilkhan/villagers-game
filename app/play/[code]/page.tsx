@@ -343,9 +343,25 @@ function RoundView({
     ? "Choose a villager"
     : "Vote for who you suspect";
 
+  // Dead players can cast a day vote when the host enabled ghost votes.
+  const ghostCanVote = !isNight && !alive && state.settings.ghostVotes;
+  const canVote = alive || ghostCanVote;
+
   const targets = state.players.filter(
     (p) => p.alive && p.token !== state.you.token
   );
+
+  // Day vote is public: map each candidate to the names voting for them so
+  // everyone can watch the tally build toward a majority in real time.
+  const nameByToken = new Map(state.players.map((p) => [p.token, p.name]));
+  const votersByTarget = new Map<string, string[]>();
+  if (!isNight && state.liveVotes) {
+    for (const [voter, target] of Object.entries(state.liveVotes)) {
+      const list = votersByTarget.get(target) ?? [];
+      list.push(nameByToken.get(voter) ?? "?");
+      votersByTarget.set(target, list);
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -353,14 +369,20 @@ function RoundView({
         <RoleCard state={state} revealed={roleRevealed} onReveal={onReveal} />
       )}
 
-      {alive ? (
+      {canVote ? (
         <>
+          {ghostCanVote && (
+            <p className="text-center text-sm text-blood">
+              You are a ghost — but your voice still counts.
+            </p>
+          )}
           <p className="text-center font-display text-lg text-parchment/90">
             {prompt}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {targets.map((p) => {
               const picked = state.yourPick === p.token;
+              const voters = votersByTarget.get(p.token) ?? [];
               return (
                 <button
                   key={p.token}
@@ -373,10 +395,20 @@ function RoundView({
                 >
                   <span className="font-display text-lg text-parchment">
                     {p.name}
+                    {!isNight && voters.length > 0 && (
+                      <span className="ml-2 rounded-full bg-gold/30 px-2 text-sm text-gold">
+                        {voters.length}
+                      </span>
+                    )}
                   </span>
                   {picked && (
                     <span className="text-xs text-gold">
                       {isNight ? "chosen" : "your vote"}
+                    </span>
+                  )}
+                  {!isNight && voters.length > 0 && (
+                    <span className="mt-0.5 text-xs leading-tight text-parchment/60">
+                      {voters.join(", ")}
                     </span>
                   )}
                 </button>
@@ -390,17 +422,39 @@ function RoundView({
           )}
         </>
       ) : (
-        <div className="card p-6 text-center">
-          <p className="font-display text-xl text-blood">You are a ghost</p>
-          <p className="mt-1 text-sm text-wood">
-            Watch in silence. You cannot act or vote.
-          </p>
+        <div className="flex flex-col gap-3">
+          <div className="card p-6 text-center">
+            <p className="font-display text-xl text-blood">You are a ghost</p>
+            <p className="mt-1 text-sm text-wood">
+              Watch in silence. You cannot act or vote.
+            </p>
+          </div>
+          {!isNight && (
+            <div className="flex flex-col gap-2">
+              {targets.map((p) => {
+                const voters = votersByTarget.get(p.token) ?? [];
+                return (
+                  <div
+                    key={p.token}
+                    className="flex items-center justify-between rounded-lg border-2 border-wood-light bg-wood/40 px-3 py-2"
+                  >
+                    <span className="font-display text-lg text-parchment">
+                      {p.name}
+                    </span>
+                    <span className="text-sm text-parchment/60">
+                      {voters.length > 0 ? voters.join(", ") : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       <div className="mt-auto flex flex-col gap-2">
         <p className="text-center text-sm text-parchment/60">
-          {state.submittedCount} / {state.livingCount} chosen
+          {state.submittedCount} / {state.voterCount} chosen
         </p>
         {isHost && (
           <button

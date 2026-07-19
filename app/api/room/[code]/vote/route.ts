@@ -24,7 +24,8 @@ export async function POST(
   }
 
   const me = await getPlayer(code, token);
-  if (!me || !me.alive) {
+  // Ghosts may vote only when the host enabled it for this room.
+  if (!me || (!me.alive && !room.settings.ghostVotes)) {
     return NextResponse.json({ error: "You can't vote." }, { status: 403 });
   }
   const targetPlayer = await getPlayer(code, target);
