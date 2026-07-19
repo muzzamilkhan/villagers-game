@@ -47,7 +47,8 @@ export function useGameStream(code: string, token: string | null) {
         setConnected(false);
         es.close();
         // EventSource would retry on its own, but we control backoff here.
-        if (!stopped) setTimeout(connect, 1500);
+        // Keep it short so reconnect gaps after a serverless timeout stay tiny.
+        if (!stopped) setTimeout(connect, 250);
       };
     };
 

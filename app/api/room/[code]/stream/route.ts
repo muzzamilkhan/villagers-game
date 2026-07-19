@@ -5,6 +5,9 @@ import { buildClientState, getPlayer, savePlayer } from "@/lib/game";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Keep the SSE function alive as long as the platform allows so the stream
+// isn't torn down mid-game (adjust to your Vercel plan's max).
+export const maxDuration = 300;
 
 // Server-Sent Events: one long-lived stream per player. A dedicated Redis
 // connection subscribes to the room channel; every publish triggers a fresh,
@@ -80,6 +83,9 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Stop proxies (nginx/Vercel) from buffering the event stream so
+      // each push reaches the client immediately.
+      "X-Accel-Buffering": "no",
     },
   });
 }
