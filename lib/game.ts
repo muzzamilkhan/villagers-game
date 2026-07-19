@@ -155,8 +155,8 @@ export async function resolveVote(code: string, room: Room): Promise<Room> {
   for (const [voter, target] of Object.entries(votes)) {
     const v = byToken.get(voter);
     if (!v) continue;
-    // Dead players count only when ghost-voting is enabled for the room.
-    if (!v.alive && !room.settings.ghostVotes) continue;
+    // Dead players count only with ghost-voting on, and never dead killers.
+    if (!v.alive && (!room.settings.ghostVotes || v.role === "killer")) continue;
     tally.set(target, (tally.get(target) ?? 0) + 1);
   }
 
@@ -277,10 +277,14 @@ export async function buildClientState(
     players.filter((p) => p.alive).map((p) => p.token)
   );
   const ghostDayVote = room.phase === "day_vote" && room.settings.ghostVotes;
-  // Who may submit this phase: living players always, plus ghosts during the
-  // day when the host enabled ghost votes.
+  // Who may submit this phase: living players always, plus non-killer ghosts
+  // during the day when the host enabled ghost votes.
   const eligibleTokens = ghostDayVote
-    ? new Set(players.map((p) => p.token))
+    ? new Set(
+        players
+          .filter((p) => p.alive || p.role !== "killer")
+          .map((p) => p.token)
+      )
     : livingTokens;
 
   let submitted = false;

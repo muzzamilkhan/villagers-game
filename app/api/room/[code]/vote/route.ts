@@ -24,8 +24,12 @@ export async function POST(
   }
 
   const me = await getPlayer(code, token);
-  // Ghosts may vote only when the host enabled it for this room.
-  if (!me || (!me.alive && !room.settings.ghostVotes)) {
+  // Ghosts may vote only when the host enabled it, and never if they were a
+  // killer — a dead killer's vote would just help their side from the grave.
+  if (
+    !me ||
+    (!me.alive && (!room.settings.ghostVotes || me.role === "killer"))
+  ) {
     return NextResponse.json({ error: "You can't vote." }, { status: 403 });
   }
   const targetPlayer = await getPlayer(code, target);
