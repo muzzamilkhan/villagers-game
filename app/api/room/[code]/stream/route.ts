@@ -18,6 +18,9 @@ export async function GET(
 ) {
   const code = normalizeCode((await params).code);
   const token = req.nextUrl.searchParams.get("token") ?? "";
+  // Observers (big-screen projection) watch passively: no token, no player
+  // record, and only ever public state.
+  const observer = req.nextUrl.searchParams.get("observer") === "1";
 
   const encoder = new TextEncoder();
   const sub = subscriber();
@@ -27,15 +30,15 @@ export async function GET(
       let closed = false;
       const send = async () => {
         if (closed) return;
-        const state = await buildClientState(code, token);
+        const state = await buildClientState(code, token, { observer });
         const payload = state
           ? `event: state\ndata: ${JSON.stringify(state)}\n\n`
           : `event: gone\ndata: {}\n\n`;
         controller.enqueue(encoder.encode(payload));
       };
 
-      // mark connected
-      const me = await getPlayer(code, token);
+      // mark connected (observers have no player record to flag)
+      const me = observer ? null : await getPlayer(code, token);
       if (me && !me.connected) {
         me.connected = true;
         await savePlayer(code, me);
