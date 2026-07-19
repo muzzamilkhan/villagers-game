@@ -18,21 +18,27 @@ export function clearToken(code: string): void {
 }
 
 // Subscribe to the room's SSE stream. Reconnects automatically on drop.
-export function useGameStream(code: string, token: string | null) {
+// Pass `observer` to watch passively (no token, public state only).
+export function useGameStream(
+  code: string,
+  token: string | null,
+  observer = false
+) {
   const [state, setState] = useState<ClientState | null>(null);
   const [gone, setGone] = useState(false);
   const [connected, setConnected] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token && !observer) return;
     let stopped = false;
 
     const connect = () => {
       if (stopped) return;
-      const es = new EventSource(
-        `/api/room/${code}/stream?token=${encodeURIComponent(token)}`
-      );
+      const url = observer
+        ? `/api/room/${code}/stream?observer=1`
+        : `/api/room/${code}/stream?token=${encodeURIComponent(token!)}`;
+      const es = new EventSource(url);
       esRef.current = es;
 
       es.addEventListener("state", (e) => {
@@ -57,7 +63,7 @@ export function useGameStream(code: string, token: string | null) {
       stopped = true;
       esRef.current?.close();
     };
-  }, [code, token]);
+  }, [code, token, observer]);
 
   return { state, gone, connected };
 }

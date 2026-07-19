@@ -59,6 +59,10 @@ export interface ClientState {
   phase: Phase;
   round: number;
   settings: GameSettings;
+  // True when this stream is a passive observer (big-screen projection), not a
+  // player. Observers never see hidden roles and can't act; `you` is a synthetic
+  // placeholder in that case.
+  observer: boolean;
   you: {
     token: string;
     name: string;

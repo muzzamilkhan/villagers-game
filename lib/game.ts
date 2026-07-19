@@ -273,21 +273,30 @@ export async function advancePhase(code: string, room: Room): Promise<Room> {
 
 export async function buildClientState(
   code: string,
-  viewerToken: string
+  viewerToken: string,
+  opts: { observer?: boolean } = {}
 ): Promise<ClientState | null> {
   const room = await getRoom(code);
   if (!room) return null;
   const players = await getPlayers(code);
-  const you = players.find((p) => p.token === viewerToken);
-  if (!you) return null;
 
-  const viewerIsKiller = you.role === "killer";
+  const observer = opts.observer === true;
+  // A passive observer isn't a player. It only ever sees public information, so
+  // it can safely watch on a shared screen without leaking roles. `you` is a
+  // synthetic placeholder that never participates.
+  const you = observer
+    ? undefined
+    : players.find((p) => p.token === viewerToken);
+  if (!observer && !you) return null;
+
+  const viewerIsKiller = !observer && you!.role === "killer";
 
   const publicPlayers: PublicPlayer[] = players.map((p) => {
     const revealRole =
       room.phase === "game_over" || // reveal all at the end
-      p.token === viewerToken ||
-      (viewerIsKiller && p.role === "killer"); // killers know each other
+      (!observer &&
+        (p.token === viewerToken ||
+          (viewerIsKiller && p.role === "killer"))); // killers know each other
     return {
       token: p.token,
       name: p.name,
@@ -355,13 +364,23 @@ export async function buildClientState(
     phase: room.phase,
     round: room.round,
     settings: room.settings,
-    you: {
-      token: you.token,
-      name: you.name,
-      role: you.role,
-      alive: you.alive,
-      isHost: you.token === room.hostToken,
-    },
+    observer,
+    you: you
+      ? {
+          token: you.token,
+          name: you.name,
+          role: you.role,
+          alive: you.alive,
+          isHost: you.token === room.hostToken,
+        }
+      : {
+          // Synthetic placeholder for a spectator — never a real player.
+          token: "",
+          name: "Spectator",
+          role: "villager",
+          alive: true,
+          isHost: false,
+        },
     players: publicPlayers,
     submitted,
     yourPick,
