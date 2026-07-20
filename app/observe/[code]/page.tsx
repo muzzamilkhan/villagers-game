@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGameStream } from "@/lib/client";
 import type { ClientState, Phase, Role } from "@/lib/types";
@@ -81,7 +81,52 @@ function Screen({
           />
         ))}
       </div>
-      {children}
+      <AutoZoom>{children}</AutoZoom>
+    </div>
+  );
+}
+
+// Zooms the whole observer view up as one unit — everything bigger, in place,
+// aspect ratio locked, centered — until it touches the nearest viewport edges.
+// The phase background (outside this wrapper) fills any remaining space. Renders
+// children at natural size and applies a uniform CSS scale; no reflow, so text
+// never re-wraps and nothing moves relative to anything else.
+function AutoZoom({ children }: { children: React.ReactNode }) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    // offsetWidth/Height report the layout (pre-transform) size, so measuring is
+    // independent of the scale we apply — no feedback loop.
+    const measure = () => {
+      const cw = inner.offsetWidth;
+      const ch = inner.offsetHeight;
+      if (cw === 0 || ch === 0) return;
+      const next = Math.min(outer.clientWidth / cw, outer.clientHeight / ch);
+      setScale(next > 0 ? next : 1);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    ro.observe(inner);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={outerRef}
+      className="flex flex-1 items-center justify-center overflow-hidden"
+    >
+      <div
+        ref={innerRef}
+        style={{ transform: `scale(${scale})`, transformOrigin: "center" }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
