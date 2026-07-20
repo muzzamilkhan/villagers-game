@@ -31,6 +31,11 @@ async function step(
 const GAME_OVER_TEXTS = ["The Village Prevails", "The Killers Win"];
 const MAX_ROUNDS = 20;
 
+// Deliberate sim-only pauses so a watched run is followable — they don't touch
+// the game, only how patiently the host bot clicks through each beat.
+const LOCK_VOTES_WAIT_MS = 2000; // host lingers on the tally before locking
+const RESULT_WAIT_MS = 3000; // host holds on each night/day result (death or not)
+
 async function main() {
   const config = parseArgs(process.argv.slice(2));
   const names = assignNames(config.bots);
@@ -88,8 +93,9 @@ async function main() {
 
     // Play `config.games` games back-to-back in the same room. Between games the
     // host clicks "New game", which resets the room to the lobby (same code,
-    // players, and settings) — see app/api/room/[code]/reset. The whole
-    // start→rounds→result sequence repeats against that fresh lobby.
+    // players, and settings) — see app/api/room/[code]/reset. After the final
+    // game the host clicks "End game", wiping the room for everyone. The whole
+    // start→rounds→result sequence repeats against each fresh lobby.
     // Role-based watching (--player killer/healer/villager) surfaces a matching
     // bot in the visible browser once roles exist. Only meaningful on the first
     // game; after that the chosen bot is already in the headful window.
@@ -116,6 +122,12 @@ async function main() {
         await step("new game → lobby", specPage, ["The Gathering"]);
         for (const b of bots) b.resetForNewGame();
         console.log("  New game — back in the lobby.");
+      } else {
+        // Final game: host ends it, wiping the room. The spectator's stream then
+        // reports the room is gone ("This game has ended.").
+        await host.endGame();
+        await step("end game → gone", specPage, ["This game has ended"]);
+        console.log("  End game — room wiped.");
       }
     }
   } finally {
@@ -172,7 +184,8 @@ async function playGame(
       // crest, so a bot the sim still thinks is alive would hang trying to vote.
       syncDeaths(bots, await announcement(specPage), round, "night");
       if (await ended(specPage)) break;
-      await host.callTrial();
+      // Hold on the reveal before opening the trial, so it's watchable.
+      await host.callTrial(RESULT_WAIT_MS);
 
       // ---- DAY ----
       // Spectator shows "The Trial" / "Who shall be cast out?" during the vote.
@@ -180,7 +193,8 @@ async function playGame(
       const voters = bots.filter((b) => b.alive || config.ghostVotes);
       console.log(`  [round ${round}] day: ${voters.length} voters…`);
       await Promise.all(voters.map((b) => b.doDayVote({ killerNames: b.role === "killer" ? killerNames : [] })));
-      await host.lockVotes();
+      // Linger on the tally so a watched run can read the votes before locking.
+      await host.lockVotes(LOCK_VOTES_WAIT_MS);
       // NOTE: deliberately "was cast out", not bare "cast out" — the day_vote
       // headline itself reads "Who shall be cast out?" (line 137), so a bare
       // "cast out" substring is already on the page before the vote even locks
@@ -192,7 +206,8 @@ async function playGame(
       syncDeaths(bots, await announcement(specPage), round, "day");
 
       if (await ended(specPage)) break;
-      await host.onward();
+      // Hold on the verdict before the next night, so it's watchable.
+      await host.onward(RESULT_WAIT_MS);
       // Accept the win banner here too: advancing can itself reveal an
       // end-state, and we'd rather break the loop than wait for a "Night
       // falls" that never comes.

@@ -8,3 +8,7 @@ export function humanDelayMs(): number {
 export function humanPause(): Promise<void> {
   return new Promise((r) => setTimeout(r, humanDelayMs()));
 }
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}

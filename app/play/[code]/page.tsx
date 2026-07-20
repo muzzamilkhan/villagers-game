@@ -254,7 +254,9 @@ function TopBar({
     <div className="flex items-center justify-between text-parchment/80">
       <span className="flex items-center gap-3">
         <span className="font-display text-lg">{phaseLabel[state.phase]}</span>
-        {isHost && <EndGameButton act={act} />}
+        {/* Game-over has its own New game / End game buttons on the GameOver
+            screen, so the top-bar End game would be a duplicate there. */}
+        {isHost && state.phase !== "game_over" && <EndGameButton act={act} />}
         {onTogglePlayers && (
           <button
             className={`rounded-md border px-2 py-1 text-xs ${

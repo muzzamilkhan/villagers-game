@@ -9,8 +9,9 @@ export interface SimConfig {
   maxPlayers: number;
   url: string;
   player: PlayerView;
-  // How many games to play back-to-back. After each finish (except the last),
-  // the host clicks "New game" to reset the same room to the lobby. Default 1.
+  // How many games to play back-to-back in the same room. Between games the host
+  // clicks "New game" (games - 1 times); after the final game the host clicks
+  // "End game", wiping the room. Default 1 (a single game, then End game).
   games: number;
 }
 

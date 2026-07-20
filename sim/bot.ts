@@ -1,6 +1,6 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import type { SimConfig, Role } from "./types";
-import { humanPause } from "./pacing";
+import { humanPause, sleep } from "./pacing";
 import {
   awaitSee, clickTarget, revealRole, readLivingNames,
 } from "./ui";
@@ -140,19 +140,31 @@ export class Bot {
     await clickTarget(this.page, target);
   }
 
-  async callTrial(): Promise<void> {
+  // Host advances past the night reveal into the day. `waitMs` is a deliberate
+  // sim-only pause before the click, so the beat is watchable — it doesn't
+  // change the game, only how patiently the bot drives it.
+  async callTrial(waitMs = 0): Promise<void> {
     const btn = this.page.getByRole("button", { name: "Continue", exact: true });
     await btn.waitFor({ state: "visible" });
+    if (waitMs > 0) await sleep(waitMs);
     await btn.click();
   }
 
-  async lockVotes(): Promise<void> {
-    await this.page.getByRole("button", { name: "Lock in the Votes" }).click();
+  // Host locks the day votes. `waitMs` pauses (sim-only) before locking so the
+  // vote tally is watchable first.
+  async lockVotes(waitMs = 0): Promise<void> {
+    const btn = this.page.getByRole("button", { name: "Lock in the Votes" });
+    await btn.waitFor({ state: "visible" });
+    if (waitMs > 0) await sleep(waitMs);
+    await btn.click();
   }
 
-  async onward(): Promise<void> {
+  // Host advances past the day result into the next night. `waitMs` is a
+  // sim-only pause before the click, so the verdict is watchable.
+  async onward(waitMs = 0): Promise<void> {
     const btn = this.page.getByRole("button", { name: "Continue", exact: true });
     await btn.waitFor({ state: "visible" });
+    if (waitMs > 0) await sleep(waitMs);
     await btn.click();
   }
 
@@ -160,6 +172,16 @@ export class Bot {
   // players, and settings. The room drops back to the lobby for everyone.
   async newGame(): Promise<void> {
     await this.page.getByRole("button", { name: "New game", exact: true }).click();
+  }
+
+  // Host-only, from the game-over screen: end the game for everyone. Wipes the
+  // room from Redis; every player's stream then reports the room is gone.
+  //
+  // The game-over screen's own "End game" is the last such button in the DOM —
+  // older builds also render a top-bar "End game" in every phase, so scope to
+  // the last match to avoid a strict-mode clash on those.
+  async endGame(): Promise<void> {
+    await this.page.getByRole("button", { name: "End game", exact: true }).last().click();
   }
 
   // Reset per-game bot bookkeeping when a new game begins. Roles are re-assigned
