@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, keys, publish } from "@/lib/redis";
 import { normalizeCode } from "@/lib/codes";
 import { getRoom, getPlayers, saveRoom, savePlayer, assignRoles } from "@/lib/game";
+import { minPlayersToStart } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,10 +27,10 @@ export async function POST(
   }
 
   const players = await getPlayers(code);
-  const minPlayers = room.settings.killers + (room.settings.healer ? 1 : 0) + 2;
-  if (players.length < Math.max(4, minPlayers)) {
+  const minPlayers = minPlayersToStart(room.settings);
+  if (players.length < minPlayers) {
     return NextResponse.json(
-      { error: `Need at least ${Math.max(4, minPlayers)} players to start.` },
+      { error: `Need at least ${minPlayers} players to start.` },
       { status: 409 }
     );
   }

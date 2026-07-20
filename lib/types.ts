@@ -16,6 +16,16 @@ export interface GameSettings {
   ghostVotes: boolean; // dead players may still cast a day vote
 }
 
+// Fewest players a game may start with, scaled to the killer count. Killers win
+// the moment `killers >= other living players` (see checkWin), so the villagers
+// need a real cushion: we require the non-killers to outnumber the killers by at
+// least 2 at kickoff (total ≥ 2·killers + 2). That keeps the game from being
+// won — or nearly won — before the first night. For the common 1-killer game
+// this is 4; for 2 killers it's 6.
+export function minPlayersToStart(settings: GameSettings): number {
+  return 2 * settings.killers + 2;
+}
+
 export interface Player {
   token: string; // private, stored client-side
   name: string;
