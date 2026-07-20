@@ -185,6 +185,8 @@ is a real end-to-end run against the live URL that reaches `game_over`.
 
 - Configurable pacing / speed flags.
 - Multiple concurrent games.
-- Bot chat / naming personalities beyond simple `Bot 1..N` names.
+- Bot chat / personalities. (Bots do get flavorful **medieval names** drawn
+  from a fixed pool — e.g. Sir Reginald, Lady Morwenna — assigned uniquely per
+  game, so the spectator screen reads naturally; but no per-bot behavior differs.)
 - Any changes to the game itself or the existing `e2e/` harness.
 - Scripted/deterministic outcomes — outcomes emerge from light strategy + RNG.
