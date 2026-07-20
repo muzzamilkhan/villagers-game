@@ -122,6 +122,9 @@ async function main() {
       // immediately, unlike the players' suspense-held card) — UNLESS the kill
       // ends the game, in which case it jumps straight to the game-over banner
       // (no "Dawn"). Accept either so the loop can break on the win below.
+      // Observer Header still shows the "Dawn" phase label during resolve even
+      // though the stage now renders composed Outcome text. Either that or a
+      // game-over banner (a lethal night can end the game with no resolve beat).
       await step("night resolve", specPage, ["Dawn", ...GAME_OVER_TEXTS]);
       // Mark night deaths NOW, before the day vote — a ghost has no clickable
       // crest, so a bot the sim still thinks is alive would hang trying to vote.
@@ -136,6 +139,12 @@ async function main() {
       console.log(`  [round ${round}] day: ${voters.length} voters…`);
       await Promise.all(voters.map((b) => b.doDayVote({ killerNames: b.role === "killer" ? killerNames : [] })));
       await host.lockVotes();
+      // NOTE: deliberately "was cast out", not bare "cast out" — the day_vote
+      // headline itself reads "Who shall be cast out?" (line 137), so a bare
+      // "cast out" substring is already on the page before the vote even locks
+      // and this step would resolve instantly against the wrong phase. Composed
+      // castout_killer/castout_innocent text (lib/narration.tsx) always reads
+      // "{name} was cast out — …", which "Who shall be cast out?" does not contain.
       await step("day result", specPage, ["was cast out", "No one was cast out", ...GAME_OVER_TEXTS]);
       // Mark the day's elimination (if any) before the next night.
       syncDeaths(bots, await announcement(specPage), round, "day");
@@ -187,10 +196,14 @@ function syncDeaths(
   round: number,
   phase: "night" | "day",
 ): void {
-  const verb = phase === "night" ? "was slain" : "was cast out";
+  const lower = text.toLowerCase();
+  const verb = phase === "night" ? "slain" : "cast out";
   for (const b of bots) {
     if (!b.alive) continue;
-    if (text.includes(`${b.name} ${verb}`)) {
+    // Composed outcome text keeps "{name} … {verb}" in reading order
+    // (lib/narration.tsx). Match name followed by the verb, case-insensitive.
+    const nameIdx = lower.indexOf(b.name.toLowerCase());
+    if (nameIdx !== -1 && lower.indexOf(verb, nameIdx) !== -1) {
       b.alive = false;
       console.log(`  [round ${round}] ${phase}: ${b.name} died`);
     }

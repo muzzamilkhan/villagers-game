@@ -141,7 +141,7 @@ export class Bot {
   }
 
   async callTrial(): Promise<void> {
-    const btn = this.page.getByRole("button", { name: "Call the Trial" });
+    const btn = this.page.getByRole("button", { name: "Continue", exact: true });
     await btn.waitFor({ state: "visible" });
     await btn.click();
   }
@@ -151,7 +151,9 @@ export class Bot {
   }
 
   async onward(): Promise<void> {
-    await this.page.getByRole("button", { name: "Onward to Night" }).click();
+    const btn = this.page.getByRole("button", { name: "Continue", exact: true });
+    await btn.waitFor({ state: "visible" });
+    await btn.click();
   }
 
   async close(): Promise<void> {
