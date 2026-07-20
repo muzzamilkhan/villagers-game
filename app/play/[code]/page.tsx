@@ -11,6 +11,7 @@ import {
 import { useSound } from "@/lib/sound";
 import { minPlayersToStart } from "@/lib/types";
 import type { ClientState, Phase, Role } from "@/lib/types";
+import { Outcome, DAWN_FLAVOR, pickNarration } from "@/lib/narration";
 
 const ROLE_INFO: Record<Role, { title: string; blurb: string; color: string }> = {
   villager: {
@@ -142,7 +143,7 @@ export default function GamePage({
           alive={alive}
           isHost={isHost}
           roleRevealed={roleRevealed}
-          onReveal={() => setRoleRevealed(true)}
+          onToggle={() => setRoleRevealed((v) => !v)}
           act={act}
         />
       )}
@@ -378,7 +379,7 @@ function PlayersPanel({
         </div>
       ))}
       <p className="text-xs text-wood">
-        Removing a player can end the game if it changes who's left standing.
+        Removing a player can end the game if it changes who&apos;s left standing.
       </p>
     </div>
   );
@@ -543,18 +544,18 @@ function ShareLink({ code }: { code: string }) {
 function RoleCard({
   state,
   revealed,
-  onReveal,
+  onToggle,
 }: {
   state: ClientState;
   revealed: boolean;
-  onReveal: () => void;
+  onToggle: () => void;
 }) {
   const info = ROLE_INFO[state.you.role];
   if (!revealed) {
     return (
-      <button className="card p-6 text-center" onClick={onReveal}>
+      <button className="card p-6 text-center" onClick={onToggle}>
         <p className="font-display text-lg">Tap to reveal your role</p>
-        <p className="mt-1 text-sm text-wood">(keep it hidden from others)</p>
+        <p className="mt-1 text-sm text-wood">(make sure no one is looking)</p>
       </button>
     );
   }
@@ -565,7 +566,7 @@ function RoleCard({
         )
       : [];
   return (
-    <div className="card p-5 text-center">
+    <button className="card w-full p-5 text-center" onClick={onToggle}>
       <p className={`font-display text-3xl font-bold ${info.color}`}>
         {info.title}
       </p>
@@ -575,7 +576,8 @@ function RoleCard({
           With you: {fellowKillers.map((p) => p.name).join(", ")}
         </p>
       )}
-    </div>
+      <p className="mt-3 text-xs text-wood/70">(tap to hide)</p>
+    </button>
   );
 }
 
@@ -584,14 +586,14 @@ function RoundView({
   alive,
   isHost,
   roleRevealed,
-  onReveal,
+  onToggle,
   act,
 }: {
   state: ClientState;
   alive: boolean;
   isHost: boolean;
   roleRevealed: boolean;
-  onReveal: () => void;
+  onToggle: () => void;
   act: (p: string, b: Record<string, unknown>) => void;
 }) {
   const isNight = state.phase === "night_action";
@@ -627,8 +629,12 @@ function RoundView({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      {isNight && (
-        <RoleCard state={state} revealed={roleRevealed} onReveal={onReveal} />
+      {isNight && alive && (
+        <RoleCard
+          state={state}
+          revealed={roleRevealed}
+          onToggle={onToggle}
+        />
       )}
 
       {canVote ? (
@@ -648,31 +654,44 @@ function RoundView({
               return (
                 <button
                   key={p.token}
-                  className={`crest ${
+                  className={`crest relative overflow-hidden ${
                     picked
                       ? "border-gold bg-gold/30"
                       : "border-wood-light bg-wood/40"
                   }`}
                   onClick={() => act(path, { target: p.token })}
                 >
-                  <span className="font-display text-lg text-parchment">
-                    {p.name}
+                  {!isNight && state.voterCount > 0 && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 bg-black/20 transition-[width] duration-500"
+                      style={{
+                        width: `${Math.round(
+                          (voters.length / state.voterCount) * 100
+                        )}%`,
+                      }}
+                    />
+                  )}
+                  <span className="relative z-10 flex flex-col items-center">
+                    <span className="font-display text-lg text-parchment">
+                      {p.name}
+                      {!isNight && voters.length > 0 && (
+                        <span className="ml-2 rounded-full bg-gold/30 px-2 text-sm text-gold">
+                          {voters.length}
+                        </span>
+                      )}
+                    </span>
+                    {picked && (
+                      <span className="text-xs text-gold">
+                        {isNight ? "chosen" : "your vote"}
+                      </span>
+                    )}
                     {!isNight && voters.length > 0 && (
-                      <span className="ml-2 rounded-full bg-gold/30 px-2 text-sm text-gold">
-                        {voters.length}
+                      <span className="mt-0.5 text-xs leading-tight text-parchment/60">
+                        {voters.join(", ")}
                       </span>
                     )}
                   </span>
-                  {picked && (
-                    <span className="text-xs text-gold">
-                      {isNight ? "chosen" : "your vote"}
-                    </span>
-                  )}
-                  {!isNight && voters.length > 0 && (
-                    <span className="mt-0.5 text-xs leading-tight text-parchment/60">
-                      {voters.join(", ")}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -741,12 +760,14 @@ function ResultView({
   act: (p: string, b: Record<string, unknown>) => void;
 }) {
   const isNight = state.phase === "resolve";
-  const text = isNight ? state.announcement : state.voteResult;
+  const events = isNight ? state.nightOutcome : state.dayOutcome;
 
-  // The dawn reveal is held back a few seconds for suspense: as the dark→dawn
-  // background sweeps in, everyone waits to learn who survived the night before
-  // the announcement lands. The day verdict shows immediately.
+  // Night holds a ~3.5s suspense before the reveal; day reveals immediately.
   const [revealed, setRevealed] = useState(!isNight);
+  // A death/exile is a big deal: after the outcome is visible, wait 2s before
+  // the host may advance, so everyone can soak it in. Nothing auto-advances.
+  const [continueReady, setContinueReady] = useState(false);
+
   useEffect(() => {
     if (!isNight) {
       setRevealed(true);
@@ -757,11 +778,18 @@ function ResultView({
     return () => clearTimeout(t);
   }, [isNight]);
 
+  useEffect(() => {
+    if (!revealed) return;
+    setContinueReady(false);
+    const t = setTimeout(() => setContinueReady(true), 2000);
+    return () => clearTimeout(t);
+  }, [revealed]);
+
   if (isNight && !revealed) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
         <p className="animate-pulse font-display text-2xl text-parchment/85">
-          Dawn breaks over the village…
+          {pickNarration(DAWN_FLAVOR, state.narrationSeq, state.round)}
         </p>
         <p className="text-sm text-parchment/50">
           The deeds of the night come to light.
@@ -773,12 +801,18 @@ function ResultView({
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="card flex flex-1 flex-col items-center justify-center p-6 text-center">
-        <p className="font-display text-xl leading-relaxed text-ink">{text}</p>
+        <p className="font-display text-xl leading-relaxed text-ink">
+          <Outcome events={events} />
+        </p>
       </div>
       {isHost ? (
-        <button className="btn btn-primary" onClick={() => act("advance", {})}>
-          {isNight ? "Call the Trial" : "Onward to Night"}
-        </button>
+        continueReady ? (
+          <button className="btn btn-primary" onClick={() => act("advance", {})}>
+            Continue
+          </button>
+        ) : (
+          <p className="text-center text-parchment/60">Let it settle…</p>
+        )
       ) : (
         <p className="text-center text-parchment/60">
           Waiting for the Village Elder…
