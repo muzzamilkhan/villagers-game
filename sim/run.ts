@@ -40,6 +40,11 @@ async function main() {
   const config = parseArgs(process.argv.slice(2));
   const names = assignNames(config.bots);
 
+  // Name the target up front. The sim drives whatever `--url` points at
+  // (default: prod), so a run against a mid-deploy prod can show stale UI —
+  // logging the URL makes it obvious which server you're actually testing.
+  console.log(`\n  Driving: ${config.url}`);
+
   const headless = await chromium.launch({ headless: true });
   const headful = await chromium.launch({ headless: false });
   const bots: Bot[] = [];
