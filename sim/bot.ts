@@ -101,6 +101,12 @@ export class Bot {
     const base = this.url.endsWith("/") ? this.url : `${this.url}/`;
     await newPage.goto(`${base}play/${code}`);
 
+    // goto resolves on `load`, before the SSE stream has restored this player's
+    // filtered state and rendered the night screen. Wait for the night header
+    // ("Night {round}") so the round loop doesn't drive an unhydrated page —
+    // readLivingNames does an unwaited evaluate and would otherwise see [].
+    await awaitSee(newPage, ["Night "]);
+
     const oldCtx = this.ctx;
     this.ctx = newCtx;
     this.page = newPage;
