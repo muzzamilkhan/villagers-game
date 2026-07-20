@@ -254,9 +254,9 @@ function VoteTally({ state }: { state: ClientState }) {
   }
   const living = state.players.filter((p) => p.alive);
   const max = Math.max(1, ...counts.values());
-  const rows = living
-    .map((p) => ({ name: p.name, count: counts.get(p.token) ?? 0 }))
-    .sort((a, b) => b.count - a.count);
+  // Keep rows in stable roster (join) order — do NOT sort by vote count, so a
+  // player's row stays put while its bar fills; only the counts/widths change.
+  const rows = living.map((p) => ({ name: p.name, count: counts.get(p.token) ?? 0 }));
 
   return (
     <div className="flex w-full flex-col gap-3">
