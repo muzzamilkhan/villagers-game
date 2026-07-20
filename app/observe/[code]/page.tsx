@@ -91,6 +91,12 @@ function Screen({
 // The phase background (outside this wrapper) fills any remaining space. Renders
 // children at natural size and applies a uniform CSS scale; no reflow, so text
 // never re-wraps and nothing moves relative to anything else.
+// Fixed design width the content is laid out at before scaling. Pinning it makes
+// wide text (outcome lines) wrap the same way every phase, so all phases share a
+// stable aspect and zoom by a consistent-feeling amount — instead of wide-short
+// phases blowing out their natural width and refusing to zoom.
+const DESIGN_WIDTH = 1100;
+
 function AutoZoom({ children }: { children: React.ReactNode }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -123,7 +129,11 @@ function AutoZoom({ children }: { children: React.ReactNode }) {
     >
       <div
         ref={innerRef}
-        style={{ transform: `scale(${scale})`, transformOrigin: "center" }}
+        style={{
+          width: DESIGN_WIDTH,
+          transform: `scale(${scale})`,
+          transformOrigin: "center",
+        }}
       >
         {children}
       </div>
