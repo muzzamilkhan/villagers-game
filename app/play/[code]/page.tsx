@@ -8,6 +8,7 @@ import {
   useGameStream,
   postAction,
 } from "@/lib/client";
+import { useSound } from "@/lib/sound";
 import { minPlayersToStart } from "@/lib/types";
 import type { ClientState, Phase, Role } from "@/lib/types";
 
@@ -51,11 +52,21 @@ export default function GamePage({
   }, [code, router]);
 
   const { state, gone, connected } = useGameStream(code, token);
+  const sound = useSound();
 
   // reset the role reveal each new round
   useEffect(() => {
     if (state?.phase === "night_action") setRoleRevealed(false);
   }, [state?.round, state?.phase]);
+
+  // Play a phase cue on every phase change (and once the winner lands on
+  // game_over). No-op while sound is off. `playForPhase` is stable per
+  // enabled-state, so this fires on genuine transitions, not on every publish.
+  useEffect(() => {
+    if (!state) return;
+    sound.playForPhase(state.phase, state.winner);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.phase, state?.winner]);
 
   if (gone) {
     return (
@@ -100,6 +111,8 @@ export default function GamePage({
         connected={connected}
         isHost={isHost}
         act={act}
+        soundEnabled={sound.enabled}
+        onToggleSound={sound.toggle}
         showPlayers={showPlayers}
         onTogglePlayers={
           isHost && state.phase !== "lobby"
@@ -207,6 +220,8 @@ function TopBar({
   connected,
   isHost,
   act,
+  soundEnabled,
+  onToggleSound,
   showPlayers,
   onTogglePlayers,
 }: {
@@ -215,6 +230,8 @@ function TopBar({
   connected: boolean;
   isHost: boolean;
   act: (p: string, b: Record<string, unknown>) => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
   showPlayers: boolean;
   onTogglePlayers?: () => void;
 }) {
@@ -245,6 +262,7 @@ function TopBar({
         )}
       </span>
       <span className="flex items-center gap-2 text-sm">
+        <SoundToggle enabled={soundEnabled} onToggle={onToggleSound} />
         <span
           className={`h-2 w-2 rounded-full ${
             connected ? "bg-forest" : "bg-blood"
@@ -253,6 +271,30 @@ function TopBar({
         {code}
       </span>
     </div>
+  );
+}
+
+// Speaker toggle for the per-phase sound cues. Off by default (see useSound);
+// enabling it is the user gesture that unlocks audio in the browser.
+function SoundToggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={enabled}
+      aria-label={enabled ? "Mute sound effects" : "Enable sound effects"}
+      title={enabled ? "Sound on" : "Sound off"}
+      className={`text-base leading-none ${
+        enabled ? "text-gold" : "text-parchment/40"
+      }`}
+    >
+      {enabled ? "🔊" : "🔇"}
+    </button>
   );
 }
 
