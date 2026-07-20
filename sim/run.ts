@@ -44,13 +44,18 @@ async function main() {
   const headful = await chromium.launch({ headless: false });
   const bots: Bot[] = [];
 
-  // spectator context lives on the headful (visible) browser
-  const specCtx = await headful.newContext();
+  // The spectator is always our phase oracle. It is only the *visible* window
+  // when the operator asked to watch the spectator; otherwise it runs headless.
+  const specBrowser = config.player === "spectator" ? headful : headless;
+  const specCtx = await specBrowser.newContext();
   const specPage = await specCtx.newPage();
+
+  // The host is visible from launch only when the operator asked to watch it.
+  const hostBrowser = config.player === "host" ? headful : headless;
 
   try {
     // 1. Host creates.
-    const host = await Bot.create(headless, names[0], true, config.url);
+    const host = await Bot.create(hostBrowser, names[0], true, config.url);
     bots.push(host);
     const code = await host.createGame(config);
     console.log(`\n  Game code: ${code}\n`);
@@ -62,9 +67,18 @@ async function main() {
     await specPage.getByRole("button", { name: "Spectate", exact: true }).click();
     await specPage.waitForURL("**/observe/**");
 
+    // For --player random, one non-host bot (indices 1..bots-1) is visible from
+    // the start. Chosen now, before roles exist, so its role is whatever the
+    // server later assigns.
+    const randomIdx =
+      config.player === "random"
+        ? 1 + Math.floor(Math.random() * (config.bots - 1))
+        : -1;
+
     // 3. Remaining bots join, one at a time.
     for (let i = 1; i < config.bots; i++) {
-      const b = await Bot.create(headless, names[i], false, config.url);
+      const browser = i === randomIdx ? headful : headless;
+      const b = await Bot.create(browser, names[i], false, config.url);
       await b.join(code);
       bots.push(b);
       console.log(`  ${names[i]} joined (${i + 1}/${config.bots})`);
@@ -79,6 +93,16 @@ async function main() {
     await Promise.all(bots.map((b) => awaitSee(b.page, ["Night 1"]).then(() => b.learnRole())));
     const killerNames = bots.filter((b) => b.role === "killer").map((b) => b.name);
     console.log(`  Roles assigned. (${killerNames.length} killer(s))`);
+
+    // Role-based picks aren't knowable until now: surface a matching bot in the
+    // visible browser by migrating its token-bound identity into a headful page.
+    if (config.player === "killer" || config.player === "healer" || config.player === "villager") {
+      const pick = bots.find((b) => !b.isHost && b.role === config.player);
+      if (!pick)
+        throw new Error(`no bot was assigned the ${config.player} role to watch`);
+      await pick.migrateTo(headful, code);
+      console.log(`  Watching ${pick.name} (${config.player}).`);
+    }
 
     // 6. Round loop.
     for (let round = 1; round <= MAX_ROUNDS; round++) {
