@@ -76,16 +76,16 @@ export default function Home() {
       {mode === "menu" && (
         <div className="flex flex-col gap-3">
           <button className="btn btn-primary" onClick={() => setMode("create")}>
-            Create a Game
+            Create
           </button>
           <button className="btn btn-ghost" onClick={() => setMode("join")}>
-            Join a Game
+            Join
           </button>
           <button className="btn btn-ghost" onClick={() => setMode("observe")}>
-            Observe a Game
+            Spectate
           </button>
           <p className="text-center text-sm text-parchment/50">
-            Observing shows the game on a shared screen — great for projecting.
+            Spectating shows the game on a shared screen — great for projecting.
           </p>
         </div>
       )}
@@ -204,7 +204,7 @@ export default function Home() {
               : mode === "create"
                 ? "Create"
                 : mode === "observe"
-                  ? "Observe"
+                  ? "Spectate"
                   : "Join"}
           </button>
           <button className="btn btn-ghost" onClick={() => setMode("menu")} disabled={busy}>

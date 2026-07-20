@@ -29,12 +29,12 @@ web app. One phone per player, one shared game code, discussion happens out loud
 - Night action **times out → no kill** that night.
 - The **dead are silent ghosts**: they watch, but can't act, vote, or chat.
 
-### Observer mode (big screen)
-Pick **Observe a Game** on the landing page and enter the code — no name needed.
+### Spectator mode (big screen)
+Pick **Spectate** on the landing page and enter the code — no name needed.
 This opens a full-screen, read-only view (`/observe/CODE`) meant to be projected
 so the whole room can follow along: the current phase, a live day-vote tally, the
 roster of who's alive or fallen, and every role revealed once the game ends.
-Observers only ever receive **public** state — hidden roles are never sent to the
+Spectators only ever receive **public** state — hidden roles are never sent to the
 projected screen — and they can't act, vote, or affect the game.
 
 ## Stack
@@ -70,7 +70,7 @@ to Vercel.
 
 ```
 app/
-  page.tsx                     landing — create, join, or observe
+  page.tsx                     landing — create, join, or spectate
   play/[code]/page.tsx         the whole game (host controls shown inline)
   observe/[code]/page.tsx      read-only big-screen spectator view
   api/room/create              create a room

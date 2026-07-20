@@ -117,9 +117,9 @@ async function joinCommit(page: Page) {
 
 async function observeGame(page: Page, code: string) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Observe a Game" }).click();
+  await page.getByRole("button", { name: "Spectate" }).click();
   await page.getByPlaceholder("ABCD").fill(code);
-  await page.getByRole("button", { name: "Observe", exact: true }).click();
+  await page.getByRole("button", { name: "Spectate", exact: true }).click();
   await page.waitForURL("**/observe/**");
 }
 
