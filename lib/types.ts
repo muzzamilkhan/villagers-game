@@ -8,6 +8,17 @@ export type Phase =
   | "day_result"
   | "game_over";
 
+// A single thing that happened at a resolution, sent structured so the client
+// can compose the sentence and style the important words. Carries only player
+// NAMES (already public) — never roles.
+export type OutcomeEvent =
+  | { type: "kill"; player: string }
+  | { type: "save"; player: string }
+  | { type: "quiet" }
+  | { type: "castout_killer"; player: string }
+  | { type: "castout_innocent"; player: string }
+  | { type: "no_agreement" };
+
 export interface GameSettings {
   maxPlayers: number; // up to 10
   killers: number; // 1 or 2
@@ -44,10 +55,13 @@ export interface Room {
   createdAt: number;
   // per-round scratch
   lastHealTarget?: string; // token healed last night (block repeat)
-  // resolution announcement for the current round
-  announcement?: string;
-  // outcome of the last day vote
-  voteResult?: string;
+  // structured resolution outcome for the current round (client composes text)
+  nightOutcome?: OutcomeEvent[];
+  // structured outcome of the last day vote
+  dayOutcome?: OutcomeEvent[];
+  // per-game shuffled 0..9 sequence; indexes the ambient narration pools by
+  // round so every player + the observer see the same flavor line each round.
+  narrationSeq?: number[];
   // set when the game ends
   winner?: "villagers" | "killers";
 }
@@ -95,7 +109,8 @@ export interface ClientState {
   // Lets everyone see who's voting for whom before the host locks it in.
   // Never populated at night — night actions stay secret.
   liveVotes?: Record<string, string>;
-  announcement?: string;
-  voteResult?: string;
+  nightOutcome?: OutcomeEvent[];
+  dayOutcome?: OutcomeEvent[];
+  narrationSeq?: number[];
   winner?: "villagers" | "killers";
 }
