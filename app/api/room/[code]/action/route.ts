@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { redis, keys, publish } from "@/lib/redis";
+import { redis, keys, publish, ROOM_TTL_SEC } from "@/lib/redis";
 import { normalizeCode } from "@/lib/codes";
 import { getRoom, getPlayer, getPlayers, resolveNight } from "@/lib/game";
 
@@ -33,6 +33,7 @@ export async function POST(
   }
 
   await redis().hset(keys.actions(code), token, target);
+  await redis().expire(keys.actions(code), ROOM_TTL_SEC);
 
   // Auto-resolve once every living player has picked.
   const [players, actions] = await Promise.all([

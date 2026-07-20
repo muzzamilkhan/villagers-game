@@ -156,6 +156,21 @@ export class Bot {
     await btn.click();
   }
 
+  // Host-only, from the game-over screen: start a fresh game with the same code,
+  // players, and settings. The room drops back to the lobby for everyone.
+  async newGame(): Promise<void> {
+    await this.page.getByRole("button", { name: "New game", exact: true }).click();
+  }
+
+  // Reset per-game bot bookkeeping when a new game begins. Roles are re-assigned
+  // server-side, so we clear the old role and revive the bot; the round loop
+  // re-learns the role after the host starts.
+  resetForNewGame(): void {
+    this.role = undefined;
+    this.alive = true;
+    this.lastHeal = undefined;
+  }
+
   async close(): Promise<void> {
     await this.ctx.close().catch(() => {});
   }

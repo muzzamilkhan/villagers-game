@@ -1,8 +1,8 @@
 import { chromium } from "playwright";
-import readline from "node:readline";
 import { parseArgs } from "./args";
 import { assignNames } from "./names";
 import { Bot, type RoundCtx } from "./bot";
+import type { SimConfig } from "./types";
 import { bodyText, awaitSee } from "./ui";
 
 // Wrap a wait so a timeout tells us WHERE we were and what the page showed,
@@ -30,11 +30,6 @@ async function step(
 // game_over banners the GameOver component renders.
 const GAME_OVER_TEXTS = ["The Village Prevails", "The Killers Win"];
 const MAX_ROUNDS = 20;
-
-function prompt(msg: string): Promise<void> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => rl.question(msg, () => { rl.close(); resolve(); }));
-}
 
 async function main() {
   const config = parseArgs(process.argv.slice(2));
@@ -89,25 +84,67 @@ async function main() {
       console.log(`  ${names[i]} joined (${i + 1}/${config.bots})`);
     }
 
-    // 4. Pause for operator.
     console.log(`\n  All ${config.bots} bots in the lobby: ${names.join(", ")}`);
-    await prompt("\n  ▶ Press Enter to start the game... ");
 
+    // Play `config.games` games back-to-back in the same room. Between games the
+    // host clicks "New game", which resets the room to the lobby (same code,
+    // players, and settings) — see app/api/room/[code]/reset. The whole
+    // start→rounds→result sequence repeats against that fresh lobby.
+    // Role-based watching (--player killer/healer/villager) surfaces a matching
+    // bot in the visible browser once roles exist. Only meaningful on the first
+    // game; after that the chosen bot is already in the headful window.
+    const migrateWatched =
+      config.player === "killer" || config.player === "healer" || config.player === "villager"
+        ? async () => {
+            const pick = bots.find((b) => !b.isHost && b.role === config.player);
+            if (!pick)
+              throw new Error(`no bot was assigned the ${config.player} role to watch`);
+            await pick.migrateTo(headful, code);
+            console.log(`  Watching ${pick.name} (${config.player}).`);
+          }
+        : undefined;
+
+    for (let game = 1; game <= config.games; game++) {
+      if (config.games > 1) console.log(`\n  ===== Game ${game}/${config.games} =====`);
+      await playGame(config, host, bots, specPage, game === 1 ? migrateWatched : undefined);
+
+      if (game < config.games) {
+        // New game: host resets from the game-over screen; everyone drops back
+        // to the lobby. Wait on the spectator's lobby label, then re-arm the
+        // bots for fresh role assignment.
+        await host.newGame();
+        await step("new game → lobby", specPage, ["The Gathering"]);
+        for (const b of bots) b.resetForNewGame();
+        console.log("  New game — back in the lobby.");
+      }
+    }
+  } finally {
+    for (const b of bots) await b.close();
+    await specCtx.close().catch(() => {});
+    await headless.close().catch(() => {});
+    await headful.close().catch(() => {});
+  }
+}
+
+// One full game: start, learn roles, run the round loop, report the winner.
+// Assumes every bot is sitting in the lobby (fresh game or a post-reset lobby).
+async function playGame(
+  config: SimConfig,
+  host: Bot,
+  bots: Bot[],
+  specPage: import("playwright").Page,
+  // Runs once roles are known — used on the first game to migrate a role-matched
+  // bot into the visible browser. Roles are re-assigned each game, so a caller
+  // that only wants this on game 1 clears its own hook after firing.
+  onRolesAssigned?: () => Promise<void>,
+): Promise<void> {
     // 5. Start + learn roles.
     await host.begin();
     await Promise.all(bots.map((b) => awaitSee(b.page, ["Night 1"]).then(() => b.learnRole())));
     const killerNames = bots.filter((b) => b.role === "killer").map((b) => b.name);
     console.log(`  Roles assigned. (${killerNames.length} killer(s))`);
 
-    // Role-based picks aren't knowable until now: surface a matching bot in the
-    // visible browser by migrating its token-bound identity into a headful page.
-    if (config.player === "killer" || config.player === "healer" || config.player === "villager") {
-      const pick = bots.find((b) => !b.isHost && b.role === config.player);
-      if (!pick)
-        throw new Error(`no bot was assigned the ${config.player} role to watch`);
-      await pick.migrateTo(headful, code);
-      console.log(`  Watching ${pick.name} (${config.player}).`);
-    }
+    await onRolesAssigned?.();
 
     // 6. Round loop.
     for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -167,13 +204,6 @@ async function main() {
     const finalText = await bodyText(specPage);
     const winner = GAME_OVER_TEXTS.find((t) => finalText.includes(t)) ?? "(unknown)";
     console.log(`\n  Game over — ${winner}\n`);
-    await prompt("  ▶ Press Enter to close the spectator and exit... ");
-  } finally {
-    for (const b of bots) await b.close();
-    await specCtx.close().catch(() => {});
-    await headless.close().catch(() => {});
-    await headful.close().catch(() => {});
-  }
 }
 
 async function ended(page: import("playwright").Page): Promise<boolean> {

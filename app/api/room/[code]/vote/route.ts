@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { redis, keys, publish } from "@/lib/redis";
+import { redis, keys, publish, ROOM_TTL_SEC } from "@/lib/redis";
 import { normalizeCode } from "@/lib/codes";
 import { getRoom, getPlayer } from "@/lib/game";
 
@@ -39,6 +39,7 @@ export async function POST(
 
   // Votes stay editable until the host locks them.
   await redis().hset(keys.votes(code), token, target);
+  await redis().expire(keys.votes(code), ROOM_TTL_SEC);
   await publish(code);
 
   return NextResponse.json({ ok: true });

@@ -153,7 +153,13 @@ export default function GamePage({
       )}
 
       {state.phase === "game_over" && (
-        <GameOver state={state} code={code} router={router} />
+        <GameOver
+          state={state}
+          code={code}
+          router={router}
+          isHost={isHost}
+          act={act}
+        />
       )}
     </div>
   );
@@ -826,10 +832,14 @@ function GameOver({
   state,
   code,
   router,
+  isHost,
+  act,
 }: {
   state: ClientState;
   code: string;
   router: ReturnType<typeof useRouter>;
+  isHost: boolean;
+  act: (p: string, b: Record<string, unknown>) => void;
 }) {
   const villagersWon = state.winner === "villagers";
   return (
@@ -869,15 +879,35 @@ function GameOver({
           </div>
         ))}
       </div>
-      <button
-        className="btn btn-primary mt-auto"
-        onClick={() => {
-          clearToken(code);
-          router.push("/");
-        }}
-      >
-        Home
-      </button>
+      {isHost ? (
+        // Host chooses: play again with the same code, players, and settings,
+        // or wipe the room for everyone. "New game" resets to the lobby; the
+        // stream drops everyone straight back into it, no navigation needed.
+        <div className="mt-auto flex flex-col gap-2">
+          <button
+            className="btn btn-primary"
+            onClick={() => act("reset", {})}
+          >
+            New game
+          </button>
+          <button
+            className="btn"
+            onClick={() => act("end", {})}
+          >
+            End game
+          </button>
+        </div>
+      ) : (
+        <button
+          className="btn btn-primary mt-auto"
+          onClick={() => {
+            clearToken(code);
+            router.push("/");
+          }}
+        >
+          Home
+        </button>
+      )}
     </div>
   );
 }

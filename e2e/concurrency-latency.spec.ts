@@ -347,6 +347,25 @@ test("10 players + observer see every move in near real time", async ({ browser 
     await expect(host.page.getByText("The Village Prevails")).toBeVisible();
     await expect(observer.page.getByText("The Village Prevails")).toBeVisible();
 
+    // --- host starts a New game: same code + players, everyone back in the lobby ---
+    await measure(
+      "new_game",
+      [
+        // Host sees the lobby's start control; other players see the waiting
+        // line; the observer's lobby label reads "The Gathering".
+        { name: host.name, page: host.page, texts: ["Begin the Game"] },
+        ...players
+          .filter((p) => !p.isHost)
+          .map((p) => ({ name: p.name, page: p.page, texts: ["Waiting for the Village Elder"] })),
+        { name: observer.name, page: observer.page, texts: ["The Gathering"] },
+      ],
+      async () => {
+        await host.page.getByRole("button", { name: "New game", exact: true }).click();
+      }
+    );
+    // All 10 players survive the reset (same room, same seats).
+    await expect(host.page.getByText("Begin the Game")).toBeVisible();
+
     // Sanity: every event type produced samples.
     const summary = recorder.summarize();
     const seen = new Set(summary.map((s) => s.event));

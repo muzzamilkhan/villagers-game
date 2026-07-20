@@ -75,6 +75,31 @@ export async function clearTargetReferences(
   }
 }
 
+// New game: return a finished room to the lobby, keeping the same code, players,
+// host, and settings. Resets everything else — round, roles, outcomes, narration,
+// and the per-round scratch (actions/votes). Players keep their seats but are
+// reset to living villagers; roles are re-assigned when the host starts again.
+export async function resetRoom(code: string, room: Room): Promise<Room> {
+  const players = await getPlayers(code);
+  for (const p of players) {
+    await savePlayer(code, { ...p, role: "villager", alive: true });
+  }
+
+  room.phase = "lobby";
+  room.round = 0;
+  room.nightOutcome = undefined;
+  room.dayOutcome = undefined;
+  room.narrationSeq = undefined;
+  room.lastHealTarget = undefined;
+  room.winner = undefined;
+
+  const r = redis();
+  await r.del(keys.actions(code));
+  await r.del(keys.votes(code));
+  await saveRoom(room);
+  return room;
+}
+
 // Wipe every trace of a room from Redis. After this, buildClientState returns
 // null for all viewers, so each SSE stream pushes a `gone` event and closes.
 export async function deleteRoom(code: string): Promise<void> {

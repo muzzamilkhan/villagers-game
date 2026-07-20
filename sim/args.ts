@@ -20,6 +20,7 @@ export function parseArgs(argv: string[]): SimConfig {
   let maxPlayers: number | undefined;
   let url = DEFAULT_URL;
   let player: PlayerView = "spectator";
+  let games = 1;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -42,6 +43,7 @@ export function parseArgs(argv: string[]): SimConfig {
       case "--no-ghost-votes": ghostVotes = false; break;
       case "--max-players": maxPlayers = Number(next()); break;
       case "--url": url = next(); break;
+      case "--games": games = Number(next()); break;
       case "--player": {
         const v = next() as PlayerView;
         if (!PLAYER_VIEWS.includes(v))
@@ -65,5 +67,8 @@ export function parseArgs(argv: string[]): SimConfig {
   if (player === "healer" && !healer)
     throw new Error("--player healer requires a healer in the game (drop --no-healer)");
 
-  return { bots, killers, healer, ghostVotes, maxPlayers, url, player };
+  if (!Number.isInteger(games) || games < 1)
+    throw new Error("--games must be a positive integer");
+
+  return { bots, killers, healer, ghostVotes, maxPlayers, url, player, games };
 }

@@ -55,3 +55,16 @@ test("rejects unknown --player value", () => {
 test("--player healer with --no-healer errors", () => {
   assert.throws(() => parseArgs(["--player", "healer", "--no-healer"]), /healer/);
 });
+
+test("defaults games to 1", () => {
+  assert.equal(parseArgs([]).games, 1);
+});
+
+test("parses --games", () => {
+  assert.equal(parseArgs(["--games", "3"]).games, 3);
+});
+
+test("rejects non-positive --games", () => {
+  assert.throws(() => parseArgs(["--games", "0"]), /--games must be a positive integer/);
+  assert.throws(() => parseArgs(["--games", "1.5"]), /--games must be a positive integer/);
+});

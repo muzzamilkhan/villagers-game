@@ -9,6 +9,9 @@ export interface SimConfig {
   maxPlayers: number;
   url: string;
   player: PlayerView;
+  // How many games to play back-to-back. After each finish (except the last),
+  // the host clicks "New game" to reset the same room to the lobby. Default 1.
+  games: number;
 }
 
 export type Role = "villager" | "killer" | "healer";

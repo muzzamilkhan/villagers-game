@@ -47,7 +47,11 @@ export function subscriber(): Redis {
   });
 }
 
-export const ROOM_TTL_SEC = 60 * 60 * 4; // rooms self-clean after 4h
+// Rooms self-clean after REDIS_TTL_HOURS (default 2h). The TTL is refreshed on
+// every write (see saveRoom), so it counts from the last activity, not creation.
+const ttlHours = Number(process.env.REDIS_TTL_HOURS);
+export const ROOM_TTL_SEC =
+  60 * 60 * (Number.isFinite(ttlHours) && ttlHours > 0 ? ttlHours : 2);
 
 export const keys = {
   room: (code: string) => `room:${code}`,
