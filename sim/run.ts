@@ -5,6 +5,25 @@ import { assignNames } from "./names.ts";
 import { Bot, type RoundCtx } from "./bot.ts";
 import { bodyText, awaitSee } from "./ui.ts";
 
+// Wrap a wait so a timeout tells us WHERE we were and what the page showed,
+// instead of a bare "Timeout 30000ms exceeded".
+async function step(
+  label: string,
+  page: import("playwright").Page,
+  texts: string[],
+): Promise<void> {
+  try {
+    await awaitSee(page, texts);
+  } catch (e) {
+    const body = await bodyText(page).catch(() => "<no body>");
+    console.error(
+      `\n  [STALLED] "${label}" — never saw ${JSON.stringify(texts)}\n` +
+        `  --- page body (first 800 chars) ---\n${body.slice(0, 800)}\n  ---`,
+    );
+    throw e;
+  }
+}
+
 // Confirmed live against app/play/[code]/page.tsx:771 — the only two
 // game_over banners the GameOver component renders.
 const GAME_OVER_TEXTS = ["The Village Prevails", "The Killers Win"];
@@ -62,35 +81,40 @@ async function main() {
     // 6. Round loop.
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       // ---- NIGHT ----
+      // Phase is detected from the SPECTATOR page, whose neutral game view is
+      // the same no matter who is alive. The host bot is a mortal player: once
+      // it is killed or voted out it becomes a ghost and its own screen shows
+      // ghost text instead of player prompts — so we never wait on the host's
+      // perspective. The host still HOLDS the advance controls after death
+      // (the button is gated on isHost, not alive), so it keeps driving.
       const nightCtx = (b: Bot): RoundCtx => ({ killerNames: b.role === "killer" ? killerNames : [] });
-      await Promise.all(bots.filter((b) => b.alive).map((b) => b.doNightAction(nightCtx(b))));
-      // Night auto-resolves once all living players submit. The resolve screen
-      // holds a suspense card for ~3.5s ("Dawn breaks over the village…")
-      // before revealing the announcement text; either the reveal (host sees
-      // "Call the Trial") or, as a fallback in case of timing weirdness, the
-      // announcement text itself is enough to know we've moved past night.
-      await awaitSee(host.page, [
-        "Dawn breaks over the village",
-        "Call the Trial",
-        "was slain in the night",
-        "No one was harmed",
-      ]);
-      if (await ended(host.page)) break;
+      const alive = bots.filter((b) => b.alive);
+      console.log(`  [round ${round}] night: ${alive.length} bots submitting…`);
+      await Promise.all(alive.map((b) => b.doNightAction(nightCtx(b))));
+      // Night auto-resolves server-side once all living players submit; the
+      // spectator flips to the "Dawn" resolve screen (announcement shown
+      // immediately, unlike the players' suspense-held card).
+      await step("night resolve", specPage, ["Dawn"]);
+      // Mark night deaths NOW, before the day vote — a ghost has no clickable
+      // crest, so a bot the sim still thinks is alive would hang trying to vote.
+      syncDeaths(bots, await announcement(specPage), round, "night");
+      if (await ended(specPage)) break;
       await host.callTrial();
 
       // ---- DAY ----
-      await awaitSee(host.page, ["Vote for who you suspect"]);
+      // Spectator shows "The Trial" / "Who shall be cast out?" during the vote.
+      await step("open day vote", specPage, ["Who shall be cast out"]);
       const voters = bots.filter((b) => b.alive || config.ghostVotes);
+      console.log(`  [round ${round}] day: ${voters.length} voters…`);
       await Promise.all(voters.map((b) => b.doDayVote({ killerNames: b.role === "killer" ? killerNames : [] })));
       await host.lockVotes();
-      await awaitSee(host.page, ["was cast out", "No one was cast out", ...GAME_OVER_TEXTS]);
+      await step("day result", specPage, ["was cast out", "No one was cast out", ...GAME_OVER_TEXTS]);
+      // Mark the day's elimination (if any) before the next night.
+      syncDeaths(bots, await announcement(specPage), round, "day");
 
-      // sync alive-state from each bot's own page.
-      await syncAlive(bots);
-
-      if (await ended(host.page)) break;
+      if (await ended(specPage)) break;
       await host.onward();
-      await awaitSee(host.page, [`Night ${round + 1}`]);
+      await step("next night", specPage, ["Night falls"]);
     }
 
     // 7. Result.
@@ -111,22 +135,34 @@ async function ended(page: import("playwright").Page): Promise<boolean> {
   return GAME_OVER_TEXTS.some((x) => t.includes(x));
 }
 
-// There is no "you were slain" text anywhere in the app — death announcements
-// are third-person by name: night deaths read `"{name} was slain in the
-// night."` (lib/game.ts:164) and day eliminations read `"{name} was cast out
-// — and was indeed a killer!"` / `"{name} was cast out — but was innocent."`
-// (lib/game.ts:218-219). So each still-alive bot marks itself dead by
-// checking whether ITS OWN name appears in that phrasing on its own screen.
-async function syncAlive(bots: Bot[]): Promise<void> {
-  await Promise.all(
-    bots.map(async (b) => {
-      if (!b.alive) return;
-      const t = await bodyText(b.page);
-      if (t.includes(`${b.name} was slain`) || t.includes(`${b.name} was cast out`)) {
-        b.alive = false;
-      }
-    }),
-  );
+// The spectator's headline text for the current beat: the night announcement
+// during `resolve` ("{name} was slain in the night." / a quiet-dawn line) and
+// the vote verdict during `day_result` ("{name} was cast out — …" / a no-one
+// line). We read it from the spectator, not the players' screens, because the
+// observer reveals it immediately while player screens hold a ~3.5s suspense
+// card — reading a player page too early would miss the death.
+async function announcement(specPage: import("playwright").Page): Promise<string> {
+  return bodyText(specPage);
+}
+
+// Mark any bot the announcement names as dead. Death phrasing is third-person
+// by name (lib/game.ts:164 "{name} was slain in the night."; lib/game.ts:218-219
+// "{name} was cast out — …"). At most one player dies per resolution, but we
+// scan all names defensively.
+function syncDeaths(
+  bots: Bot[],
+  text: string,
+  round: number,
+  phase: "night" | "day",
+): void {
+  const verb = phase === "night" ? "was slain" : "was cast out";
+  for (const b of bots) {
+    if (!b.alive) continue;
+    if (text.includes(`${b.name} ${verb}`)) {
+      b.alive = false;
+      console.log(`  [round ${round}] ${phase}: ${b.name} died`);
+    }
+  }
 }
 
 main().catch((e) => {
