@@ -4,6 +4,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useGameStream } from "@/lib/client";
 import type { ClientState, Phase, Role } from "@/lib/types";
+import { Outcome, NIGHT_FLAVOR, pickNarration } from "@/lib/narration";
 
 // A passive, read-only view of a game meant to be projected on a shared screen.
 // It streams the same per-viewer filtered state as a player would — but as an
@@ -178,7 +179,7 @@ function Stage({ state }: { state: ClientState }) {
             The village sleeps
           </p>
           <p className="text-xl text-wood md:text-2xl">
-            Under cover of dark, choices are made in silence.
+            {pickNarration(NIGHT_FLAVOR, state.narrationSeq, state.round)}
           </p>
           <Progress state={state} label="acted" />
         </>
@@ -186,7 +187,11 @@ function Stage({ state }: { state: ClientState }) {
 
       {state.phase === "resolve" && (
         <p className="font-display text-4xl leading-relaxed text-ink md:text-6xl">
-          {state.announcement ?? "Dawn breaks over the village…"}
+          {state.nightOutcome ? (
+            <Outcome events={state.nightOutcome} />
+          ) : (
+            "Dawn breaks over the village…"
+          )}
         </p>
       )}
 
@@ -194,7 +199,11 @@ function Stage({ state }: { state: ClientState }) {
 
       {state.phase === "day_result" && (
         <p className="font-display text-4xl leading-relaxed text-ink md:text-6xl">
-          {state.voteResult ?? "The village deliberates…"}
+          {state.dayOutcome ? (
+            <Outcome events={state.dayOutcome} />
+          ) : (
+            "The village deliberates…"
+          )}
         </p>
       )}
 
@@ -294,7 +303,7 @@ function Roster({ state }: { state: ClientState }) {
         {state.players.map((p) => (
           <div
             key={p.token}
-            className={`flex items-center justify-between rounded-lg border-2 px-4 py-3 ${
+            className={`flex flex-col rounded-lg border-2 px-4 py-3 ${
               p.alive
                 ? "border-wood-light bg-wood/40"
                 : "border-wood-light/40 bg-black/30 opacity-60"
@@ -302,23 +311,35 @@ function Roster({ state }: { state: ClientState }) {
           >
             <span className="flex items-center gap-2 font-display text-xl md:text-2xl">
               {!p.alive && <span aria-hidden>💀</span>}
-              <span className={p.alive ? "text-parchment" : "text-parchment/50 line-through"}>
+              <span
+                className={
+                  p.alive
+                    ? "text-parchment"
+                    : "text-parchment/50 line-through"
+                }
+              >
                 {p.name}
               </span>
-              {p.isHost && <span className="text-sm text-gold">Elder</span>}
             </span>
-            {p.role ? (
-              <span className={`font-display text-lg ${ROLE_COLOR[p.role]}`}>
-                {p.role}
-              </span>
-            ) : (
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  p.connected ? "bg-forest" : "bg-wood-light/50"
-                }`}
-                title={p.connected ? "connected" : "away"}
-              />
-            )}
+            {/* Fixed-height label slot so every row is the same height whether
+                or not it carries a role/host tag. */}
+            <span className="mt-0.5 flex h-5 items-center gap-2 text-sm">
+              {p.isHost && <span className="text-gold">(Elder)</span>}
+              {p.role ? (
+                <span className={`font-display ${ROLE_COLOR[p.role]}`}>
+                  ({p.role})
+                </span>
+              ) : (
+                !p.isHost && (
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      p.connected ? "bg-forest" : "bg-wood-light/50"
+                    }`}
+                    title={p.connected ? "connected" : "away"}
+                  />
+                )
+              )}
+            </span>
           </div>
         ))}
       </div>
