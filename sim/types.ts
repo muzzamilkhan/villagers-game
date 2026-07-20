@@ -1,3 +1,6 @@
+export type PlayerView =
+  | "spectator" | "host" | "random" | "killer" | "healer" | "villager";
+
 export interface SimConfig {
   bots: number;
   killers: 1 | 2;
@@ -5,6 +8,7 @@ export interface SimConfig {
   ghostVotes: boolean;
   maxPlayers: number;
   url: string;
+  player: PlayerView;
 }
 
 export type Role = "villager" | "killer" | "healer";

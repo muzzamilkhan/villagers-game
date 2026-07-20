@@ -1,6 +1,10 @@
-import type { SimConfig } from "./types";
+import type { SimConfig, PlayerView } from "./types";
 
 const DEFAULT_URL = "https://villagers-game-pied.vercel.app/";
+
+const PLAYER_VIEWS: PlayerView[] = [
+  "spectator", "host", "random", "killer", "healer", "villager",
+];
 
 function minPlayersToStart(killers: number): number {
   return 2 * killers + 2;
@@ -15,6 +19,7 @@ export function parseArgs(argv: string[]): SimConfig {
   let ghostVotes = false;
   let maxPlayers: number | undefined;
   let url = DEFAULT_URL;
+  let player: PlayerView = "spectator";
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -37,6 +42,13 @@ export function parseArgs(argv: string[]): SimConfig {
       case "--no-ghost-votes": ghostVotes = false; break;
       case "--max-players": maxPlayers = Number(next()); break;
       case "--url": url = next(); break;
+      case "--player": {
+        const v = next() as PlayerView;
+        if (!PLAYER_VIEWS.includes(v))
+          throw new Error(`--player must be one of ${PLAYER_VIEWS.join(", ")}`);
+        player = v;
+        break;
+      }
       default: throw new Error(`unknown flag: ${a}`);
     }
   }
@@ -50,5 +62,8 @@ export function parseArgs(argv: string[]): SimConfig {
   if (maxPlayers < bots) throw new Error("--max-players must be >= --bots");
   if (maxPlayers > 10) throw new Error("--max-players must be at most 10");
 
-  return { bots, killers, healer, ghostVotes, maxPlayers, url };
+  if (player === "healer" && !healer)
+    throw new Error("--player healer requires a healer in the game (drop --no-healer)");
+
+  return { bots, killers, healer, ghostVotes, maxPlayers, url, player };
 }

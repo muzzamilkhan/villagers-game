@@ -37,3 +37,21 @@ test("explicit --max-players must be >= bots", () => {
 test("--url overrides target", () => {
   assert.equal(parseArgs(["--url", "http://localhost:3000"]).url, "http://localhost:3000");
 });
+
+test("defaults player to spectator", () => {
+  assert.equal(parseArgs([]).player, "spectator");
+});
+
+test("parses --player values", () => {
+  for (const p of ["spectator", "host", "random", "killer", "healer", "villager"] as const) {
+    assert.equal(parseArgs(["--player", p]).player, p);
+  }
+});
+
+test("rejects unknown --player value", () => {
+  assert.throws(() => parseArgs(["--player", "wizard"]), /--player must be one of/);
+});
+
+test("--player healer with --no-healer errors", () => {
+  assert.throws(() => parseArgs(["--player", "healer", "--no-healer"]), /healer/);
+});
