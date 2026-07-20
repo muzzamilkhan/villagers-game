@@ -403,6 +403,8 @@ function Lobby({
         </p>
       </div>
 
+      {isHost && <ShareLink code={state.code} />}
+
       <div className="flex flex-col gap-2">
         <p className="font-display text-parchment/80">
           Players ({state.players.length})
@@ -451,6 +453,47 @@ function Lobby({
         )}
       </div>
     </div>
+  );
+}
+
+// Host convenience: one tap copies a join link (/play/CODE) to the clipboard
+// to drop into a group chat. The link carries the code, so it isn't shown
+// inline here — recipients open it and land on the join form, code prefilled.
+function ShareLink({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    const url = `${window.location.origin}/play/${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Clipboard API can be blocked (insecure context / permissions);
+      // fall back to a legacy execCommand copy via a hidden textarea.
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } finally {
+        document.body.removeChild(ta);
+      }
+    }
+    setCopied(true);
+  }
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  return (
+    <button className="btn btn-ghost" onClick={copy}>
+      {copied ? "Link copied!" : "Copy invite link"}
+    </button>
   );
 }
 
