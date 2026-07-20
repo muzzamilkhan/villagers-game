@@ -403,7 +403,7 @@ function Lobby({
         </p>
       </div>
 
-      {isHost && <ShareLink code={state.code} />}
+      <ShareLink code={state.code} />
 
       <div className="flex flex-col gap-2">
         <p className="font-display text-parchment/80">
@@ -456,9 +456,9 @@ function Lobby({
   );
 }
 
-// Host convenience: one tap copies a join link (/play/CODE) to the clipboard
-// to drop into a group chat. The link carries the code, so it isn't shown
-// inline here — recipients open it and land on the join form, code prefilled.
+// Any player can copy a join link (/play/CODE) to the clipboard to spread it
+// around a group chat. The link carries the code, so it isn't shown inline
+// here — recipients open it and land on the join form, code prefilled.
 function ShareLink({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
