@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { saveToken, postAction } from "@/lib/client";
 import { normalizeCode } from "@/lib/codes";
 
 export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeInner />
+    </Suspense>
+  );
+}
+
+function HomeInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Arriving at /?join=CODE (e.g. redirected from /play/CODE without a token)
+  // drops the player straight into the join form with the code prefilled.
+  const prefillCode = normalizeCode(searchParams.get("join") ?? "");
   const [mode, setMode] = useState<"menu" | "create" | "join" | "observe">(
-    "menu"
+    prefillCode ? "join" : "menu"
   );
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(prefillCode);
   const [killers, setKillers] = useState(1);
   const [healer, setHealer] = useState(true);
   const [ghostVotes, setGhostVotes] = useState(false);
