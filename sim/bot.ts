@@ -15,13 +15,19 @@ export class Bot {
   alive = true;
   private lastHeal?: string;
 
+  private ctx: BrowserContext;
+  page: Page;
+
   private constructor(
     readonly name: string,
     readonly isHost: boolean,
-    private readonly ctx: BrowserContext,
-    readonly page: Page,
+    ctx: BrowserContext,
+    page: Page,
     private readonly url: string,
-  ) {}
+  ) {
+    this.ctx = ctx;
+    this.page = page;
+  }
 
   static async create(browser: Browser, name: string, isHost: boolean, url: string): Promise<Bot> {
     const ctx = await browser.newContext();
@@ -72,6 +78,33 @@ export class Bot {
 
   async learnRole(): Promise<void> {
     this.role = await revealRole(this.page);
+  }
+
+  // Move this bot's identity into another browser (used to surface a headless
+  // bot in the visible headful window). Auth is by token in localStorage under
+  // `villagers:${code}` (lib/client.ts); we copy it into a fresh context so the
+  // server restores the same player + role, then drive that visible page.
+  async migrateTo(browser: Browser, code: string): Promise<void> {
+    const key = `villagers:${code}`;
+    const token = await this.page.evaluate(
+      (k) => window.localStorage.getItem(k),
+      key,
+    );
+    if (!token) throw new Error(`no token found for ${this.name} to migrate`);
+
+    const newCtx = await browser.newContext();
+    await newCtx.addInitScript(
+      ([k, t]) => window.localStorage.setItem(k, t),
+      [key, token] as const,
+    );
+    const newPage = await newCtx.newPage();
+    const base = this.url.endsWith("/") ? this.url : `${this.url}/`;
+    await newPage.goto(`${base}play/${code}`);
+
+    const oldCtx = this.ctx;
+    this.ctx = newCtx;
+    this.page = newPage;
+    await oldCtx.close().catch(() => {});
   }
 
   async doNightAction(ctx: RoundCtx): Promise<void> {
