@@ -93,8 +93,10 @@ async function main() {
       await Promise.all(alive.map((b) => b.doNightAction(nightCtx(b))));
       // Night auto-resolves server-side once all living players submit; the
       // spectator flips to the "Dawn" resolve screen (announcement shown
-      // immediately, unlike the players' suspense-held card).
-      await step("night resolve", specPage, ["Dawn"]);
+      // immediately, unlike the players' suspense-held card) — UNLESS the kill
+      // ends the game, in which case it jumps straight to the game-over banner
+      // (no "Dawn"). Accept either so the loop can break on the win below.
+      await step("night resolve", specPage, ["Dawn", ...GAME_OVER_TEXTS]);
       // Mark night deaths NOW, before the day vote — a ghost has no clickable
       // crest, so a bot the sim still thinks is alive would hang trying to vote.
       syncDeaths(bots, await announcement(specPage), round, "night");
@@ -103,7 +105,7 @@ async function main() {
 
       // ---- DAY ----
       // Spectator shows "The Trial" / "Who shall be cast out?" during the vote.
-      await step("open day vote", specPage, ["Who shall be cast out"]);
+      await step("open day vote", specPage, ["Who shall be cast out", ...GAME_OVER_TEXTS]);
       const voters = bots.filter((b) => b.alive || config.ghostVotes);
       console.log(`  [round ${round}] day: ${voters.length} voters…`);
       await Promise.all(voters.map((b) => b.doDayVote({ killerNames: b.role === "killer" ? killerNames : [] })));
