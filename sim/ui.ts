@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { Role } from "./types.ts";
+import type { Role } from "./types";
 
 export async function bodyText(page: Page): Promise<string> {
   return page.evaluate(() => document.body?.innerText ?? "");

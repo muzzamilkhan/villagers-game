@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseArgs } from "../args.ts";
+import { parseArgs } from "../args";
 
 test("defaults when no flags", () => {
   const c = parseArgs([]);

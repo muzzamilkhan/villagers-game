@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assignNames, NAME_POOL } from "../names.ts";
+import { assignNames, NAME_POOL } from "../names";
 
 test("returns the requested count", () => {
   assert.equal(assignNames(8).length, 8);

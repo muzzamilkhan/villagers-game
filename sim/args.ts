@@ -1,4 +1,4 @@
-import type { SimConfig } from "./types.ts";
+import type { SimConfig } from "./types";
 
 const DEFAULT_URL = "https://villagers-game-pied.vercel.app/";
 

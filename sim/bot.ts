@@ -1,10 +1,10 @@
 import type { Browser, BrowserContext, Page } from "playwright";
-import type { SimConfig, Role } from "./types.ts";
-import { humanPause } from "./pacing.ts";
+import type { SimConfig, Role } from "./types";
+import { humanPause } from "./pacing";
 import {
   awaitSee, clickTarget, revealRole, readLivingNames,
-} from "./ui.ts";
-import { chooseKillTarget, chooseHealTarget, chooseVote } from "./strategy.ts";
+} from "./ui";
+import { chooseKillTarget, chooseHealTarget, chooseVote } from "./strategy";
 
 export interface RoundCtx {
   killerNames: string[]; // populated for killers only

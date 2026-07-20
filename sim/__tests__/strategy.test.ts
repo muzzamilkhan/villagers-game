@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chooseKillTarget, chooseHealTarget, chooseVote } from "../strategy.ts";
+import { chooseKillTarget, chooseHealTarget, chooseVote } from "../strategy";
 
 test("chooseKillTarget is deterministic (first living non-killer)", () => {
   const list = ["Isolde", "Percival", "Rowena"];

@@ -1,9 +1,9 @@
 import { chromium } from "playwright";
 import readline from "node:readline";
-import { parseArgs } from "./args.ts";
-import { assignNames } from "./names.ts";
-import { Bot, type RoundCtx } from "./bot.ts";
-import { bodyText, awaitSee } from "./ui.ts";
+import { parseArgs } from "./args";
+import { assignNames } from "./names";
+import { Bot, type RoundCtx } from "./bot";
+import { bodyText, awaitSee } from "./ui";
 
 // Wrap a wait so a timeout tells us WHERE we were and what the page showed,
 // instead of a bare "Timeout 30000ms exceeded".
