@@ -32,27 +32,36 @@ export async function revealRole(page: Page): Promise<Role> {
   return title as Role;
 }
 
-// Names shown on the viewer's own screen that are still alive. Living crest
-// buttons are enabled; eliminated players are rendered struck/disabled. We read
-// the enabled crest labels.
+// Names shown on the viewer's own screen that are still alive. Confirmed live
+// (sim/probe.ts against prod, 2026-07-20): app/play/[code]/page.tsx renders
+// `button.crest` only for `state.players.filter(p => p.alive && p.token !==
+// you.token)` — i.e. the target grid during night_action/day_vote. There is
+// no `disabled` attribute; eliminated players (and self) simply aren't
+// rendered at all, rather than being shown struck-through. So this is really
+// "living targets other than me," which is exactly what callers need.
 export async function readLivingNames(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll("button.crest")) as HTMLButtonElement[];
+    const btns = Array.from(document.querySelectorAll("button.crest"));
     return btns
-      .filter((b) => !b.disabled)
       .map((b) => b.querySelector("span.text-lg")?.textContent?.trim() ?? "")
       .filter(Boolean);
   });
 }
 
-// A killer's own screen marks fellow killers. Villager/healer screens never
-// reveal roles, so this returns [] for them. We read any crest/player row that
-// carries the killer role badge text.
+// A killer's own screen marks fellow killers. Confirmed live (sim/probe.ts):
+// there is no `[data-role]` attribute or `.role-killer` class anywhere in the
+// app. Instead, RoleCard (app/play/[code]/page.tsx) renders, once the killer
+// reveals their role, a plain-text line: `With you: Name1, Name2` inside a
+// `<p class="mt-2 font-display text-blood">`. Villager/healer screens never
+// render this paragraph, so this returns [] for them.
 export async function readFellowKillers(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll("[data-role='killer'], .role-killer"));
-    return rows
-      .map((r) => r.querySelector("span.text-lg")?.textContent?.trim() ?? r.textContent?.trim() ?? "")
-      .filter(Boolean);
+    const p = Array.from(document.querySelectorAll("p.text-blood")).find((el) =>
+      el.textContent?.trim().startsWith("With you:")
+    );
+    const text = p?.textContent?.replace("With you:", "").trim() ?? "";
+    return text
+      ? text.split(",").map((n) => n.trim()).filter(Boolean)
+      : [];
   });
 }
