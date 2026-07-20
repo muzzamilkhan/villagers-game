@@ -246,7 +246,9 @@ test("10 players + observer see every move in near real time", async ({ browser 
       // the observer sees the announcement immediately.
       await measure(
         "night_resolve",
-        playerWatchers(["Dawn breaks over the village"], ["kept them alive"]),
+        // Player hold shows a seeded flavor line + the stable subline below it;
+        // observer shows the save-outcome ("alive"). Match the stable bits.
+        playerWatchers(["The deeds of the night come to light"], ["alive"]),
         async () => {
           await clickTarget(host.page, target(host));
         }
@@ -258,11 +260,11 @@ test("10 players + observer see every move in near real time", async ({ browser 
     // the target (can't vote itself) which votes the host — keeping a clean
     // plurality with no tie.
     const runDayVote = async (eliminated: Participant, fallbackName: string, eventForResolve: string, resolveWatchers: Watcher[]) => {
-      // Open the trial. The host's "Call the Trial" button only appears after the
-      // deliberate ~3.5s dawn-reveal hold on their own screen, so wait for it
+      // Open the trial. The host's "Continue" button only appears after the
+      // deliberate ~2s reveal hold on their own screen, so wait for it
       // *before* starting the timer — otherwise we'd measure that UX delay
       // instead of the actual broadcast latency.
-      const callTrial = host.page.getByRole("button", { name: "Call the Trial" });
+      const callTrial = host.page.getByRole("button", { name: "Continue", exact: true });
       await callTrial.waitFor({ state: "visible" });
       await measure(
         "night_to_day",
@@ -308,7 +310,7 @@ test("10 players + observer see every move in near real time", async ({ browser 
       dayEliminated,
       host.name,
       "day_result",
-      playerWatchers(["was cast out"], ["was cast out"], false)
+      playerWatchers(["cast out"], ["cast out"], false)
     );
     dayEliminated.alive = false;
 
@@ -317,7 +319,9 @@ test("10 players + observer see every move in near real time", async ({ browser 
       "day_to_night",
       playerWatchers(["Night 2"], observerNight),
       async () => {
-        await host.page.getByRole("button", { name: "Onward to Night" }).click();
+        await host.page
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
       }
     );
 
