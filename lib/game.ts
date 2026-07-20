@@ -6,6 +6,7 @@ import type {
   ClientState,
   PublicPlayer,
   Role,
+  OutcomeEvent,
 } from "./types";
 
 // ---------- room + player io ----------
@@ -98,6 +99,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// A shuffled 0..9 used to index the ambient narration pools by round, so the
+// flavor line is stable per round and identical for every viewer.
+export function shuffle10(): number[] {
+  return shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+}
+
 export function assignRoles(
   players: Player[],
   settings: GameSettings
@@ -150,24 +157,24 @@ export async function resolveNight(code: string, room: Room): Promise<Room> {
   const healBlocked = healTarget && healTarget === room.lastHealTarget;
   const effectiveHeal = healBlocked ? undefined : healTarget;
 
-  let announcement: string;
+  let nightOutcome: OutcomeEvent[];
   if (!victim) {
-    announcement = "The village awoke to a quiet dawn. No one was harmed.";
+    nightOutcome = [{ type: "quiet" }];
   } else if (effectiveHeal === victim) {
     const name = byToken.get(victim)?.name ?? "someone";
-    announcement = `${name} was attacked in the night… but the healer's hand kept them alive.`;
+    nightOutcome = [{ type: "save", player: name }];
   } else {
     const p = byToken.get(victim);
     if (p) {
       p.alive = false;
       await savePlayer(code, p);
-      announcement = `${p.name} was slain in the night.`;
+      nightOutcome = [{ type: "kill", player: p.name }];
     } else {
-      announcement = "A shadow passed, but the village stands.";
+      nightOutcome = [{ type: "quiet" }];
     }
   }
 
-  room.announcement = announcement;
+  room.nightOutcome = nightOutcome;
   room.lastHealTarget = effectiveHeal;
   room.phase = "resolve";
   await redis().del(keys.actions(code));
@@ -205,24 +212,24 @@ export async function resolveVote(code: string, room: Room): Promise<Room> {
     }
   }
 
-  let result: string;
+  let dayOutcome: OutcomeEvent[];
   if (!top || tie || topCount === 0) {
-    result = "The village could not agree. No one was cast out.";
+    dayOutcome = [{ type: "no_agreement" }];
   } else {
     const p = byToken.get(top);
     if (p) {
       p.alive = false;
       await savePlayer(code, p);
-      const wasKiller = p.role === "killer";
-      result = wasKiller
-        ? `${p.name} was cast out — and was indeed a killer!`
-        : `${p.name} was cast out — but was innocent.`;
+      dayOutcome =
+        p.role === "killer"
+          ? [{ type: "castout_killer", player: p.name }]
+          : [{ type: "castout_innocent", player: p.name }];
     } else {
-      result = "The accused was already gone.";
+      dayOutcome = [{ type: "no_agreement" }];
     }
   }
 
-  room.voteResult = result;
+  room.dayOutcome = dayOutcome;
   room.phase = "day_result";
   await redis().del(keys.votes(code));
   await saveRoom(room);
@@ -260,8 +267,8 @@ export async function advancePhase(code: string, room: Room): Promise<Room> {
     case "day_result":
       room.round += 1;
       room.phase = "night_action";
-      room.announcement = undefined;
-      room.voteResult = undefined;
+      room.nightOutcome = undefined;
+      room.dayOutcome = undefined;
       await saveRoom(room);
       return room;
     default:
@@ -388,8 +395,9 @@ export async function buildClientState(
     livingCount: livingTokens.size,
     voterCount,
     liveVotes,
-    announcement: room.announcement,
-    voteResult: room.voteResult,
+    nightOutcome: room.nightOutcome,
+    dayOutcome: room.dayOutcome,
+    narrationSeq: room.narrationSeq,
     winner: room.winner,
   };
 }

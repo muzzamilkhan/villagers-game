@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis, keys, publish } from "@/lib/redis";
 import { normalizeCode } from "@/lib/codes";
-import { getRoom, getPlayers, saveRoom, savePlayer, assignRoles } from "@/lib/game";
+import { getRoom, getPlayers, saveRoom, savePlayer, assignRoles, shuffle10 } from "@/lib/game";
 import { minPlayersToStart } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -42,8 +42,9 @@ export async function POST(
 
   room.phase = "night_action";
   room.round = 1;
-  room.announcement = undefined;
-  room.voteResult = undefined;
+  room.nightOutcome = undefined;
+  room.dayOutcome = undefined;
+  room.narrationSeq = shuffle10();
   room.lastHealTarget = undefined;
   await redis().del(keys.actions(code));
   await redis().del(keys.votes(code));
