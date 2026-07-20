@@ -20,7 +20,9 @@ async function step(
       `\n  [STALLED] "${label}" — never saw ${JSON.stringify(texts)}\n` +
         `  --- page body (first 800 chars) ---\n${body.slice(0, 800)}\n  ---`,
     );
-    throw e;
+    // Surface the label in the thrown message too, so the final one-line
+    // "Sim failed: …" names the stalled step even when the dump scrolls off.
+    throw new Error(`stalled at "${label}" (never saw ${JSON.stringify(texts)})`);
   }
 }
 
@@ -116,7 +118,11 @@ async function main() {
 
       if (await ended(specPage)) break;
       await host.onward();
-      await step("next night", specPage, ["Night falls"]);
+      // Accept the win banner here too: advancing can itself reveal an
+      // end-state, and we'd rather break the loop than wait for a "Night
+      // falls" that never comes.
+      await step("next night", specPage, ["Night falls", ...GAME_OVER_TEXTS]);
+      if (await ended(specPage)) break;
     }
 
     // 7. Result.
