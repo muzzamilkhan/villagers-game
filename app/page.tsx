@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { saveToken, postAction } from "@/lib/client";
 import { normalizeCode } from "@/lib/codes";
+import { minPlayersToStart } from "@/lib/types";
+import type { GameSettings } from "@/lib/types";
 
 export default function Home() {
   return (
@@ -150,7 +152,13 @@ function HomeInner() {
                           ? "border-blood bg-blood text-parchment"
                           : "border-wood-light bg-parchment/40 text-ink"
                       }`}
-                      onClick={() => setKillers(k)}
+                      onClick={() => {
+                        setKillers(k);
+                        // Keep the cap at or above the killer-scaled minimum so
+                        // the room can always reach a startable size.
+                        const min = minPlayersToStart({ killers: k } as GameSettings);
+                        setMaxPlayers((m) => Math.max(m, min));
+                      }}
                     >
                       {k}
                     </button>
@@ -187,7 +195,7 @@ function HomeInner() {
                 <span className="font-display text-sm uppercase tracking-wide">Max players</span>
                 <input
                   type="range"
-                  min={4}
+                  min={minPlayersToStart({ killers } as GameSettings)}
                   max={10}
                   value={maxPlayers}
                   onChange={(e) => setMaxPlayers(Number(e.target.value))}

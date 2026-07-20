@@ -3,13 +3,13 @@ import { nanoid } from "nanoid";
 import { redis, keys, ROOM_TTL_SEC } from "@/lib/redis";
 import { newRoomCode } from "@/lib/codes";
 import { saveRoom, savePlayer } from "@/lib/game";
+import { minPlayersToStart } from "@/lib/types";
 import type { Room, Player, GameSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function clampSettings(input: any): GameSettings {
-  const maxPlayers = Math.min(10, Math.max(3, Number(input?.maxPlayers) || 10));
   const killers = input?.killers === 2 ? 2 : 1;
   const healer = input?.healer !== false;
   const rawTimer = Number(input?.actionTimerSec);
@@ -17,6 +17,13 @@ function clampSettings(input: any): GameSettings {
     ? Math.min(120, Math.max(0, rawTimer))
     : 60;
   const ghostVotes = input?.ghostVotes === true;
+  // The room must be able to reach its own minimum, so the max can never sit
+  // below the killer-scaled floor (e.g. 2 killers require room for 6 players).
+  const minPlayers = minPlayersToStart({ killers } as GameSettings);
+  const maxPlayers = Math.min(
+    10,
+    Math.max(minPlayers, Number(input?.maxPlayers) || 10)
+  );
   return { maxPlayers, killers, healer, actionTimerSec, ghostVotes };
 }
 

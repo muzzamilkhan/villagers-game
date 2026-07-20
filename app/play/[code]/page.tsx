@@ -8,6 +8,7 @@ import {
   useGameStream,
   postAction,
 } from "@/lib/client";
+import { minPlayersToStart } from "@/lib/types";
 import type { ClientState, Phase, Role } from "@/lib/types";
 
 const ROLE_INFO: Record<Role, { title: string; blurb: string; color: string }> = {
@@ -387,7 +388,7 @@ function Lobby({
   act: (p: string, b: Record<string, unknown>) => void;
 }) {
   const s = state.settings;
-  const minToStart = Math.max(4, s.killers + (s.healer ? 1 : 0) + 2);
+  const minToStart = minPlayersToStart(s);
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div className="card p-5 text-center">
