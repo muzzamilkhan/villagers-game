@@ -13,6 +13,9 @@ discussion happens out loud. See `README.md` for the full rules and player flow.
 - **Work directly on `main`.** No feature branches, no PRs unless explicitly asked.
 - **Always commit and push when work is done.** Don't leave changes uncommitted.
 - Keep it lightweight — this is a personal hobby project.
+- **With every update to game flow, update the Playwright tests and the sim.**
+  Any change to phases, resolution, or player flow must be reflected in the
+  Playwright tests and the sim so they stay in sync with the game.
 
 ## Stack
 
