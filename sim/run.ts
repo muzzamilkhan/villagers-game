@@ -47,7 +47,18 @@ async function main() {
 
   const headless = await chromium.launch({ headless: true });
   const headful = await chromium.launch({ headless: false });
+  // Watched player windows open at iPhone-Pro size but stay resizable: the
+  // `--window-size` launch arg sets the initial window, and MOBILE_CONTEXT's
+  // `viewport: null` lets the page track the real (draggable) window. The
+  // spectator uses the plain `headful` browser so it keeps a desktop window.
+  const headfulMobile = await chromium.launch({
+    headless: false,
+    args: ["--window-size=393,852"],
+  });
   const bots: Bot[] = [];
+  // The visible browser to launch a watched window in: phone-sized for players,
+  // desktop for the spectator. Headless bots never call this.
+  const watchBrowser = (mobile: boolean) => (mobile ? headfulMobile : headful);
 
   // The spectator is always our phase oracle. It is only the *visible* window
   // when the operator asked to watch the spectator; otherwise it runs headless.
@@ -58,7 +69,7 @@ async function main() {
 
   // The host is visible from launch only when the operator asked to watch it.
   const watchHost = config.players.includes("host");
-  const hostBrowser = watchHost ? headful : headless;
+  const hostBrowser = watchHost ? watchBrowser(true) : headless;
 
   try {
     // 1. Host creates.
@@ -90,7 +101,7 @@ async function main() {
     // 3. Remaining bots join, one at a time.
     for (let i = 1; i < config.bots; i++) {
       const watched = randomIdxs.has(i);
-      const browser = watched ? headful : headless;
+      const browser = watched ? watchBrowser(true) : headless;
       const b = await Bot.create(browser, names[i], false, config.url, watched);
       await b.join(code);
       bots.push(b);
@@ -126,7 +137,7 @@ async function main() {
                   })`,
                 );
               used.add(pick);
-              await pick.migrateTo(headful, code, true);
+              await pick.migrateTo(watchBrowser(true), code, true);
               console.log(`  Watching ${pick.name} (${role}).`);
             }
           }
@@ -157,6 +168,7 @@ async function main() {
     await specCtx.close().catch(() => {});
     await headless.close().catch(() => {});
     await headful.close().catch(() => {});
+    await headfulMobile.close().catch(() => {});
   }
 }
 

@@ -6,13 +6,15 @@ import {
 } from "./ui";
 import { chooseKillTarget, chooseHealTarget, chooseVote } from "./strategy";
 
-// iPhone 15/16 Pro logical viewport. Watched non-spectator windows use this so
-// the mobile-first UI renders the way players actually see it. Spectator keeps
-// the default desktop viewport (it never passes mobile).
+// Watched non-spectator windows emulate touch so the mobile-first UI behaves the
+// way players' phones do. We deliberately DON'T pin a fixed `viewport`/`isMobile`/
+// `deviceScaleFactor` here: those lock the page to an unresizable size in Chromium.
+// Instead the window OPENS at iPhone-Pro size via the headful browser's
+// `--window-size` launch arg (see MOBILE_WINDOW in run.ts), and `viewport: null`
+// lets the page track the real window — so the operator can freely resize it.
+// Spectator keeps the default desktop context (it never passes mobile).
 const MOBILE_CONTEXT = {
-  viewport: { width: 393, height: 852 },
-  deviceScaleFactor: 3,
-  isMobile: true,
+  viewport: null,
   hasTouch: true,
 } as const;
 
