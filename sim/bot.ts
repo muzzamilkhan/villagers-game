@@ -6,6 +6,16 @@ import {
 } from "./ui";
 import { chooseKillTarget, chooseHealTarget, chooseVote } from "./strategy";
 
+// iPhone 15/16 Pro logical viewport. Watched non-spectator windows use this so
+// the mobile-first UI renders the way players actually see it. Spectator keeps
+// the default desktop viewport (it never passes mobile).
+const MOBILE_CONTEXT = {
+  viewport: { width: 393, height: 852 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+} as const;
+
 export interface RoundCtx {
   killerNames: string[]; // populated for killers only
 }
@@ -29,8 +39,14 @@ export class Bot {
     this.page = page;
   }
 
-  static async create(browser: Browser, name: string, isHost: boolean, url: string): Promise<Bot> {
-    const ctx = await browser.newContext();
+  static async create(
+    browser: Browser,
+    name: string,
+    isHost: boolean,
+    url: string,
+    mobile = false,
+  ): Promise<Bot> {
+    const ctx = await browser.newContext(mobile ? MOBILE_CONTEXT : {});
     const page = await ctx.newPage();
     return new Bot(name, isHost, ctx, page, url);
   }
@@ -84,7 +100,7 @@ export class Bot {
   // bot in the visible headful window). Auth is by token in localStorage under
   // `villagers:${code}` (lib/client.ts); we copy it into a fresh context so the
   // server restores the same player + role, then drive that visible page.
-  async migrateTo(browser: Browser, code: string): Promise<void> {
+  async migrateTo(browser: Browser, code: string, mobile = false): Promise<void> {
     const key = `villagers:${code}`;
     const token = await this.page.evaluate(
       (k) => window.localStorage.getItem(k),
@@ -92,7 +108,7 @@ export class Bot {
     );
     if (!token) throw new Error(`no token found for ${this.name} to migrate`);
 
-    const newCtx = await browser.newContext();
+    const newCtx = await browser.newContext(mobile ? MOBILE_CONTEXT : {});
     await newCtx.addInitScript(
       ([k, t]) => window.localStorage.setItem(k, t),
       [key, token] as const,
