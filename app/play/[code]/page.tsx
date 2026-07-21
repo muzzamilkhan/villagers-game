@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   loadToken,
@@ -30,6 +30,16 @@ const ROLE_INFO: Record<Role, { title: string; blurb: string; color: string }> =
     color: "text-forest",
   },
 };
+
+// Fisher–Yates shuffle returning a new array — leaves the input untouched.
+function shuffle<T>(items: T[]): T[] {
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 export default function GamePage({
   params,
@@ -619,8 +629,20 @@ function RoundView({
     state.you.role !== "killer";
   const canVote = alive || ghostCanVote;
 
-  const targets = state.players.filter(
+  const baseTargets = state.players.filter(
     (p) => p.alive && p.token !== state.you.token
+  );
+
+  // At night, each player sees the selectable villagers in their own random
+  // order — so the position of a name carries no meaning to anyone else. The
+  // order is memoized per round on the set of candidate tokens, so it stays
+  // stable across SSE re-renders within a night and re-shuffles each new night.
+  // Day voting is public, so it keeps join order (a stable, shared list).
+  const targetKey = baseTargets.map((p) => p.token).join(",");
+  const targets = useMemo(
+    () => (isNight ? shuffle(baseTargets) : baseTargets),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isNight, state.round, targetKey]
   );
 
   // Day vote is public: map each candidate to the names voting for them so
