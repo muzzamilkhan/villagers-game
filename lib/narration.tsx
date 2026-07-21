@@ -15,6 +15,16 @@ export const NIGHT_FLAVOR: string[] = [
   "In the hush, unseen hands are at work.",
   "The fire burns low; shadows lengthen and conspire.",
   "No lantern dares to burn tonight.",
+  "Owls call across the rooftops, and no one answers.",
+  "The well stands black and still under a starless sky.",
+  "Every window is dark, but not every soul is sleeping.",
+  "Frost creeps along the sills as the village dreams on.",
+  "A single set of footsteps fades into the alleys.",
+  "The church bell hangs silent, its rope swaying alone.",
+  "Somewhere a dog growls low, then thinks better of it.",
+  "The dark keeps its counsel, and its counsel is cruel.",
+  "Beneath quiet eaves, a plan is quietly made.",
+  "The night holds its breath, and so must the village.",
 ];
 
 // Shown while the dawn resolution is held back for suspense.
@@ -30,6 +40,16 @@ export const DAWN_FLAVOR: string[] = [
   "Grey light spills over the square…",
   "The night releases its grip; the truth waits in the light…",
   "Dew and dread settle together on the morning…",
+  "Smoke rises from the first hearths, thin and grey…",
+  "The square fills slowly, eyes searching for the missing…",
+  "Sunlight finds the cobbles, but warms no one yet…",
+  "The village blinks awake and starts to count its own…",
+  "Mist lifts from the fields to reveal what remains…",
+  "A hush falls as neighbours meet neighbours' eyes…",
+  "The last stars fade, and with them the night's secrets…",
+  "Bells begin to ring, calling the village to gather…",
+  "Shutters open one by one onto the waiting day…",
+  "The morning air is sharp with cold and questions…",
 ];
 
 // Deterministically pick a line: index the pool through the per-game shuffled
