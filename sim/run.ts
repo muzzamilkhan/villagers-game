@@ -4,6 +4,7 @@ import { assignNames } from "./names";
 import { Bot, type RoundCtx } from "./bot";
 import type { SimConfig } from "./types";
 import { bodyText, awaitSee } from "./ui";
+import { sleep } from "./pacing";
 
 // Wrap a wait so a timeout tells us WHERE we were and what the page showed,
 // instead of a bare "Timeout 30000ms exceeded".
@@ -35,6 +36,7 @@ const MAX_ROUNDS = 20;
 // the game, only how patiently the host bot clicks through each beat.
 const LOCK_VOTES_WAIT_MS = 2000; // host lingers on the tally before locking
 const RESULT_WAIT_MS = 3000; // host holds on each night/day result (death or not)
+const GAME_OVER_WAIT_MS = 10000; // host lingers on the game-over screen before new/end game
 
 async function main() {
   const config = parseArgs(process.argv.slice(2));
@@ -146,6 +148,11 @@ async function main() {
     for (let game = 1; game <= config.games; game++) {
       if (config.games > 1) console.log(`\n  ===== Game ${game}/${config.games} =====`);
       await playGame(config, host, bots, specPage, game === 1 ? migrateWatched : undefined);
+
+      // Sim-only: linger on the game-over screen so the result is readable
+      // before the host starts the next game or ends the room. Doesn't touch
+      // the game, only how patiently the host bot clicks off the final screen.
+      await sleep(GAME_OVER_WAIT_MS);
 
       if (game < config.games) {
         // New game: host resets from the game-over screen; everyone drops back
