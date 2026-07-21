@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientState, Phase } from "./types";
+import {
+  ALL_AUDIO_FILES,
+  BED_FILES,
+  STING_FILES,
+  planTransition,
+  type BedId,
+} from "./sound-plan";
 
 // Sound is opt-in: off by default, remembered per browser once toggled on.
 const STORAGE_KEY = "villagers:sound";
@@ -100,12 +107,106 @@ function playCue(ctx: AudioContext, cue: Cue) {
   }
 }
 
+// Levels: beds sit under table conversation, stings are present but soft.
+const BED_LEVEL = 0.35;
+const STING_LEVEL = 0.6;
+const CROSSFADE = 0.8; // seconds
+
+// Fetch + decode every audio file once, into a path→AudioBuffer map. Failures
+// are tolerated: a missing/undecodable file just leaves that entry absent, and
+// the caller falls back to the oscillator synth for that cue.
+async function loadBuffers(
+  ctx: AudioContext
+): Promise<Map<string, AudioBuffer>> {
+  const out = new Map<string, AudioBuffer>();
+  await Promise.all(
+    ALL_AUDIO_FILES.map(async (path) => {
+      try {
+        const res = await fetch(path);
+        const arr = await res.arrayBuffer();
+        out.set(path, await ctx.decodeAudioData(arr));
+      } catch {
+        // leave it out; fallback synth covers this cue
+      }
+    })
+  );
+  return out;
+}
+
+// Holds the currently-looping bed so a phase change can crossfade or leave it.
+interface CurrentBed {
+  id: BedId;
+  src: AudioBufferSourceNode;
+  gain: GainNode;
+}
+
+// A tiny real-audio player over one AudioContext. Beds loop and crossfade;
+// stings are fire-and-forget over their own gain node, layered on top.
+class AudioPlayer {
+  private bed: CurrentBed | null = null;
+  constructor(
+    private ctx: AudioContext,
+    private buffers: Map<string, AudioBuffer>
+  ) {}
+
+  get currentBedId(): BedId | null {
+    return this.bed?.id ?? null;
+  }
+
+  // Ramp the current bed to silence over CROSSFADE, then stop it.
+  private fadeOutCurrent(now: number) {
+    if (!this.bed) return;
+    const { src, gain } = this.bed;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0.0001, now + CROSSFADE);
+    src.stop(now + CROSSFADE + 0.05);
+    this.bed = null;
+  }
+
+  // Start a bed looping, faded in from silence.
+  private fadeInBed(id: BedId, now: number) {
+    const buf = this.buffers.get(BED_FILES[id]);
+    if (!buf) return; // no buffer → simply no bed (sting fallback still fires)
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(BED_LEVEL, now + CROSSFADE);
+    src.connect(gain).connect(this.ctx.destination);
+    src.start(now);
+    this.bed = { id, src, gain };
+  }
+
+  // Crossfade to a new bed id, or to silence when id is null.
+  setBed(id: BedId | null, now: number) {
+    this.fadeOutCurrent(now);
+    if (id) this.fadeInBed(id, now);
+  }
+
+  // Fire a one-shot sting layered over the bed. Returns false if its buffer is
+  // missing, so the caller can fall back to the synth.
+  playSting(path: string, now: number): boolean {
+    const buf = this.buffers.get(path);
+    if (!buf) return false;
+    const src = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    src.buffer = buf;
+    gain.gain.setValueAtTime(STING_LEVEL, now);
+    src.connect(gain).connect(this.ctx.destination);
+    src.start(now);
+    return true;
+  }
+}
+
 // Manages the on/off preference plus the AudioContext, and plays the cue for a
 // phase. Enabling is a user gesture, so that's when we create/resume the
 // context (browsers block audio until a gesture) — sound never starts on its own.
 export function useSound() {
   const [enabled, setEnabled] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
     setEnabled(window.localStorage.getItem(STORAGE_KEY) === "on");
@@ -123,24 +224,55 @@ export function useSound() {
     return ctxRef.current;
   }, []);
 
+  // Kick off buffer loading once, building the player when decoding is done.
+  const ensurePlayer = useCallback((ctx: AudioContext) => {
+    if (playerRef.current) return;
+    loadBuffers(ctx).then((buffers) => {
+      if (buffers.size > 0) playerRef.current = new AudioPlayer(ctx, buffers);
+    });
+  }, []);
+
   const toggle = useCallback(() => {
     setEnabled((on) => {
       const next = !on;
       window.localStorage.setItem(STORAGE_KEY, next ? "on" : "off");
-      if (next) ensureContext();
+      if (next) {
+        const ctx = ensureContext();
+        if (ctx) ensurePlayer(ctx);
+      }
       return next;
     });
-  }, [ensureContext]);
+  }, [ensureContext, ensurePlayer]);
 
   const playForPhase = useCallback(
     (phase: Phase, winner?: ClientState["winner"]) => {
       if (!enabled) return;
-      const cue = cueForPhase(phase, winner);
-      if (!cue) return;
       const ctx = ensureContext();
-      if (ctx) playCue(ctx, cue);
+      if (!ctx) return;
+      ensurePlayer(ctx);
+
+      const player = playerRef.current;
+      const now = ctx.currentTime;
+
+      // Player not ready yet (still decoding): fall back to the synth cue.
+      if (!player) {
+        const cue = cueForPhase(phase, winner);
+        if (cue) playCue(ctx, cue);
+        return;
+      }
+
+      const plan = planTransition(phase, winner, player.currentBedId);
+      if (plan.bedChanged) player.setBed(plan.bed, now);
+      if (plan.sting) {
+        const ok = player.playSting(STING_FILES[plan.sting], now);
+        // Sting buffer missing → fall back to the synth cue for this phase.
+        if (!ok) {
+          const cue = cueForPhase(phase, winner);
+          if (cue) playCue(ctx, cue);
+        }
+      }
     },
-    [enabled, ensureContext]
+    [enabled, ensureContext, ensurePlayer]
   );
 
   return { enabled, toggle, playForPhase };
