@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useLayoutEffect, useRef, useState } from "react";
+import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGameStream } from "@/lib/client";
+import { useSound } from "@/lib/sound";
 import type { ClientState, Phase, Role } from "@/lib/types";
 import { Outcome, NIGHT_FLAVOR, pickNarration } from "@/lib/narration";
 
@@ -17,6 +18,17 @@ export default function ObservePage({
   const code = use(params).code.toUpperCase();
   const router = useRouter();
   const { state, gone, connected } = useGameStream(code, null, true);
+  const sound = useSound();
+
+  // Play a phase cue on every phase change (and once the winner lands on
+  // game_over). The observer screen is the one most likely projected for the
+  // whole room, so it carries the same audio the player screen does — no-op
+  // while sound is off. See the player page for the matching effect.
+  useEffect(() => {
+    if (!state) return;
+    sound.playForPhase(state.phase, state.winner);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.phase, state?.winner]);
 
   if (gone) {
     return (
@@ -47,7 +59,13 @@ export default function ObservePage({
 
   return (
     <Screen phase={state.phase} winner={state.winner}>
-      <Header code={code} state={state} connected={connected} />
+      <Header
+        code={code}
+        state={state}
+        connected={connected}
+        soundEnabled={sound.enabled}
+        onToggleSound={sound.toggle}
+      />
       <div className="flex flex-1 flex-col gap-6 lg:flex-row">
         <Stage state={state} />
         <Roster state={state} />
@@ -183,10 +201,14 @@ function Header({
   code,
   state,
   connected,
+  soundEnabled,
+  onToggleSound,
 }: {
   code: string;
   state: ClientState;
   connected: boolean;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }) {
   const round = state.round > 0 ? ` · Round ${state.round}` : "";
   return (
@@ -195,13 +217,39 @@ function Header({
         {PHASE_LABEL[state.phase]}
         <span className="text-parchment/50">{round}</span>
       </span>
-      <span className="flex items-center gap-3 font-display">
+      <span className="flex items-center gap-4 font-display">
+        <SoundToggle enabled={soundEnabled} onToggle={onToggleSound} />
         <span
           className={`h-3 w-3 rounded-full ${connected ? "bg-forest" : "bg-blood"}`}
         />
         <span className="tracking-[0.3em] text-3xl md:text-5xl text-gold">{code}</span>
       </span>
     </div>
+  );
+}
+
+// Speaker toggle for the per-phase sound cues. Off by default (see useSound);
+// enabling it is the user gesture that unlocks audio in the browser. Sized up
+// for the projected observer view. Mirrors the player-page toggle.
+function SoundToggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={enabled}
+      aria-label={enabled ? "Mute sound effects" : "Enable sound effects"}
+      title={enabled ? "Sound on" : "Sound off"}
+      className={`text-3xl leading-none md:text-4xl ${
+        enabled ? "text-gold" : "text-parchment/40"
+      }`}
+    >
+      {enabled ? "🔊" : "🔇"}
+    </button>
   );
 }
 
