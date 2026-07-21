@@ -10,7 +10,8 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "sim": "tsx sim/run.ts",
-    "sim:test": "tsx --test sim/__tests__/*.test.ts"
+    "sim:test": "tsx --test sim/__tests__/*.test.ts",
+    "test:unit": "tsx --test lib/__tests__/*.test.ts"
   },
   "dependencies": {
     "eslint-config-next": "^15.5.20",
