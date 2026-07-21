@@ -51,16 +51,18 @@ async function main() {
 
   // The spectator is always our phase oracle. It is only the *visible* window
   // when the operator asked to watch the spectator; otherwise it runs headless.
-  const specBrowser = config.player === "spectator" ? headful : headless;
+  // Spectator always uses the default desktop viewport.
+  const specBrowser = config.players.includes("spectator") ? headful : headless;
   const specCtx = await specBrowser.newContext();
   const specPage = await specCtx.newPage();
 
   // The host is visible from launch only when the operator asked to watch it.
-  const hostBrowser = config.player === "host" ? headful : headless;
+  const watchHost = config.players.includes("host");
+  const hostBrowser = watchHost ? headful : headless;
 
   try {
     // 1. Host creates.
-    const host = await Bot.create(hostBrowser, names[0], true, config.url);
+    const host = await Bot.create(hostBrowser, names[0], true, config.url, watchHost);
     bots.push(host);
     const code = await host.createGame(config);
     console.log(`\n  Game code: ${code}\n`);
@@ -72,18 +74,24 @@ async function main() {
     await specPage.getByRole("button", { name: "Spectate", exact: true }).click();
     await specPage.waitForURL("**/observe/**");
 
-    // For --player random, one non-host bot (indices 1..bots-1) is visible from
-    // the start. Chosen now, before roles exist, so its role is whatever the
-    // server later assigns.
-    const randomIdx =
-      config.player === "random"
-        ? 1 + Math.floor(Math.random() * (config.bots - 1))
-        : -1;
+    // For each "random" in --player, pick one distinct non-host bot (indices
+    // 1..bots-1) to surface in its own headful window. Chosen now, before roles
+    // exist, so each bot's role is whatever the server later assigns.
+    const randomCount = config.players.filter((p) => p === "random").length;
+    const randomIdxs = new Set<number>();
+    {
+      const pool = Array.from({ length: config.bots - 1 }, (_, i) => i + 1);
+      for (let n = 0; n < randomCount && pool.length > 0; n++) {
+        const k = Math.floor(Math.random() * pool.length);
+        randomIdxs.add(pool.splice(k, 1)[0]);
+      }
+    }
 
     // 3. Remaining bots join, one at a time.
     for (let i = 1; i < config.bots; i++) {
-      const browser = i === randomIdx ? headful : headless;
-      const b = await Bot.create(browser, names[i], false, config.url);
+      const watched = randomIdxs.has(i);
+      const browser = watched ? headful : headless;
+      const b = await Bot.create(browser, names[i], false, config.url, watched);
       await b.join(code);
       bots.push(b);
       console.log(`  ${names[i]} joined (${i + 1}/${config.bots})`);
@@ -97,16 +105,30 @@ async function main() {
     // game the host clicks "End game", wiping the room for everyone. The whole
     // start→rounds→result sequence repeats against each fresh lobby.
     // Role-based watching (--player killer/healer/villager) surfaces a matching
-    // bot in the visible browser once roles exist. Only meaningful on the first
-    // game; after that the chosen bot is already in the headful window.
+    // bot per requested role value into its own headful mobile window once roles
+    // exist. Each role value consumes a distinct matching bot. Only meaningful on
+    // the first game; after that the chosen bots are already in headful windows.
+    const roleValues = config.players.filter(
+      (p) => p === "killer" || p === "healer" || p === "villager",
+    );
     const migrateWatched =
-      config.player === "killer" || config.player === "healer" || config.player === "villager"
+      roleValues.length > 0
         ? async () => {
-            const pick = bots.find((b) => !b.isHost && b.role === config.player);
-            if (!pick)
-              throw new Error(`no bot was assigned the ${config.player} role to watch`);
-            await pick.migrateTo(headful, code);
-            console.log(`  Watching ${pick.name} (${config.player}).`);
+            const used = new Set<Bot>();
+            for (const role of roleValues) {
+              const pick = bots.find(
+                (b) => !b.isHost && b.role === role && !used.has(b),
+              );
+              if (!pick)
+                throw new Error(
+                  `not enough bots with the ${role} role to watch (need ${
+                    roleValues.filter((r) => r === role).length
+                  })`,
+                );
+              used.add(pick);
+              await pick.migrateTo(headful, code, true);
+              console.log(`  Watching ${pick.name} (${role}).`);
+            }
           }
         : undefined;
 
