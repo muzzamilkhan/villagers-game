@@ -232,6 +232,16 @@ export function useSound() {
     });
   }, []);
 
+  // If sound was already enabled on a previous visit (persisted in
+  // localStorage), start decoding buffers as soon as we know that — before
+  // any user gesture — so they're ready by the first phase cue. Creating the
+  // context and decoding is allowed without a gesture; only playback isn't.
+  useEffect(() => {
+    if (!enabled) return;
+    const ctx = ensureContext();
+    if (ctx) ensurePlayer(ctx);
+  }, [enabled, ensureContext, ensurePlayer]);
+
   const toggle = useCallback(() => {
     setEnabled((on) => {
       const next = !on;
