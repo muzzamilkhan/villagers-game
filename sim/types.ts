@@ -8,7 +8,7 @@ export interface SimConfig {
   ghostVotes: boolean;
   maxPlayers: number;
   url: string;
-  player: PlayerView;
+  players: PlayerView[];
   // How many games to play back-to-back in the same room. Between games the host
   // clicks "New game" (games - 1 times); after the final game the host clicks
   // "End game", wiping the room. Default 1 (a single game, then End game).

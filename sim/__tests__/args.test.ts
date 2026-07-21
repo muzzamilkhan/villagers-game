@@ -38,18 +38,37 @@ test("--url overrides target", () => {
   assert.equal(parseArgs(["--url", "http://localhost:3000"]).url, "http://localhost:3000");
 });
 
-test("defaults player to spectator", () => {
-  assert.equal(parseArgs([]).player, "spectator");
+test("defaults players to [spectator]", () => {
+  assert.deepEqual(parseArgs([]).players, ["spectator"]);
 });
 
-test("parses --player values", () => {
+test("parses each single --player value", () => {
   for (const p of ["spectator", "host", "random", "killer", "healer", "villager"] as const) {
-    assert.equal(parseArgs(["--player", p]).player, p);
+    assert.deepEqual(parseArgs(["--player", p]).players, [p]);
   }
 });
 
-test("rejects unknown --player value", () => {
-  assert.throws(() => parseArgs(["--player", "wizard"]), /--player must be one of/);
+test("comma-splits a --player list", () => {
+  assert.deepEqual(parseArgs(["--player", "killer,healer"]).players, ["killer", "healer"]);
+});
+
+test("repeated --player flags accumulate", () => {
+  assert.deepEqual(
+    parseArgs(["--player", "killer", "--player", "healer"]).players,
+    ["killer", "healer"],
+  );
+});
+
+test("preserves duplicate --player values", () => {
+  assert.deepEqual(parseArgs(["--player", "random,random"]).players, ["random", "random"]);
+});
+
+test("trims whitespace and drops empties in --player list", () => {
+  assert.deepEqual(parseArgs(["--player", " killer , healer ,"]).players, ["killer", "healer"]);
+});
+
+test("rejects an unknown value inside a --player list", () => {
+  assert.throws(() => parseArgs(["--player", "killer,wizard"]), /--player must be one of/);
 });
 
 test("--player healer with --no-healer errors", () => {

@@ -19,7 +19,7 @@ export function parseArgs(argv: string[]): SimConfig {
   let ghostVotes = false;
   let maxPlayers: number | undefined;
   let url = DEFAULT_URL;
-  let player: PlayerView = "spectator";
+  const players: PlayerView[] = [];
   let games = 1;
 
   for (let i = 0; i < argv.length; i++) {
@@ -45,10 +45,13 @@ export function parseArgs(argv: string[]): SimConfig {
       case "--url": url = next(); break;
       case "--games": games = Number(next()); break;
       case "--player": {
-        const v = next() as PlayerView;
-        if (!PLAYER_VIEWS.includes(v))
-          throw new Error(`--player must be one of ${PLAYER_VIEWS.join(", ")}`);
-        player = v;
+        const raw = next();
+        const values = raw.split(",").map((s) => s.trim()).filter(Boolean);
+        for (const v of values) {
+          if (!PLAYER_VIEWS.includes(v as PlayerView))
+            throw new Error(`--player must be one of ${PLAYER_VIEWS.join(", ")}`);
+          players.push(v as PlayerView);
+        }
         break;
       }
       default: throw new Error(`unknown flag: ${a}`);
@@ -64,11 +67,13 @@ export function parseArgs(argv: string[]): SimConfig {
   if (maxPlayers < bots) throw new Error("--max-players must be >= --bots");
   if (maxPlayers > 10) throw new Error("--max-players must be at most 10");
 
-  if (player === "healer" && !healer)
+  if (players.length === 0) players.push("spectator");
+
+  if (players.includes("healer") && !healer)
     throw new Error("--player healer requires a healer in the game (drop --no-healer)");
 
   if (!Number.isInteger(games) || games < 1)
     throw new Error("--games must be a positive integer");
 
-  return { bots, killers, healer, ghostVotes, maxPlayers, url, player, games };
+  return { bots, killers, healer, ghostVotes, maxPlayers, url, players, games };
 }
